@@ -45,8 +45,6 @@ void yield()
 #endif
 }
 
-extern bool bExternInt;
-
 extern void __loop()
 {
 #ifdef USE_TINYUSB
@@ -55,9 +53,7 @@ extern void __loop()
 
     if (arduino::serialEventRun)
     {
-        bExternInt = true;
         arduino::serialEventRun();
-        bExternInt = false;
     }
 #if 0
     if (arduino::serialEvent1Run) {

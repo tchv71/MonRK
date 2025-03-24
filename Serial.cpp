@@ -906,11 +906,11 @@ int SerialUSB::peek()
 
 int SerialUSB::read()
 {
-  CoreMutex m(&__usb_mutex, false);
-  if (!_running || !m)
-  {
-    return -1;
-  }
+  // CoreMutex m(&__usb_mutex, false);
+  // if (!_running || !m)
+  // {
+  //   return -1;
+  // }
 
   tud_task();
   if (tud_cdc_available())
@@ -922,11 +922,11 @@ int SerialUSB::read()
 
 int SerialUSB::available()
 {
-  CoreMutex m(&__usb_mutex, false);
-  if (!_running || !m)
-  {
-    return 0;
-  }
+  // CoreMutex m(&__usb_mutex, false);
+  // if (!_running || !m)
+  // {
+  //   return 0;
+  // }
 
   tud_task();
   return tud_cdc_available();
@@ -934,11 +934,11 @@ int SerialUSB::available()
 
 int SerialUSB::availableForWrite()
 {
-  CoreMutex m(&__usb_mutex, false);
-  if (!_running || !m)
-  {
-    return 0;
-  }
+  // CoreMutex m(&__usb_mutex, false);
+  // if (!_running || !m)
+  // {
+  //   return 0;
+  // }
 
   tud_task();
   return tud_cdc_write_available();
@@ -946,11 +946,11 @@ int SerialUSB::availableForWrite()
 
 void SerialUSB::flush()
 {
-  CoreMutex m(&__usb_mutex, false);
-  if (!_running || !m)
-  {
-    return;
-  }
+  // CoreMutex m(&__usb_mutex, false);
+  // if (!_running || !m)
+  // {
+  //   return;
+  // }
 
   tud_cdc_write_flush();
   tud_task();
@@ -963,11 +963,11 @@ size_t SerialUSB::write(uint8_t c)
 
 size_t SerialUSB::write(const uint8_t *buf, size_t length)
 {
-  CoreMutex m(&__usb_mutex, false);
-  if (!_running || !m)
-  {
-    return 0;
-  }
+  // CoreMutex m(&__usb_mutex, false);
+  // if (!_running || !m)
+  // {
+  //   return 0;
+  // }
 
   static uint64_t last_avail_time;
   int written = 0;
@@ -1013,11 +1013,11 @@ size_t SerialUSB::write(const uint8_t *buf, size_t length)
 
 SerialUSB::operator bool()
 {
-  CoreMutex m(&__usb_mutex, false);
-  if (!_running || !m)
-  {
-    return false;
-  }
+  // CoreMutex m(&__usb_mutex, false);
+  // if (!_running || !m)
+  // {
+  //   return false;
+  // }
 
   tud_task();
   return tud_cdc_connected();
