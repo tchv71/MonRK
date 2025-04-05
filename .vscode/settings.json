@@ -40,7 +40,8 @@
         "tusb_option.h": "c",
         "tusb_compiler.h": "c",
         "tusb_config.h": "c",
-        "cstdlib": "cpp"
+        "cstdlib": "cpp",
+        "tusb_common.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }

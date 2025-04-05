@@ -45,16 +45,17 @@ pullLoop:
   mov y, isr        ; since we can only have one jmp pin
   jmp y--, pullLoop ; still 1? loop, otherwise, let's read
 
-  out pindirs, 8    ; set up CD0-7 as outputs
   jmp pin readStatus  ; if 'mode' is high, read status bits
 readData:
   out pins, 8       ; mode is low, send the data byte
+  out null, 8
   jmp endPart
 readStatus:  
   out null, 8       ; skip data bits
   out pins, 8       ; output the status byte
-  mov isr, x        ; make this status value available
+  ;mov isr, x        ; make this status value available
 endPart:
+  out pindirs, 8    ; set up CD0-7 as outputs
   in pins, 3        ; push CSR, CSW and MODE back through fifo
   push              ; push ^^^ back to cpu to process
 .wrap

@@ -23,6 +23,7 @@
 //#include "CoreMutex.h"
 #include "RP2040USB.h"
 
+#include "class/msc/msc.h"
 #include "tusb.h"
 #include <class/hid/hid_device.h>
 #include <class/audio/audio.h>
