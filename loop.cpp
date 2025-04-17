@@ -5,6 +5,9 @@
 
 extern SerialUSB serial;
 
+const uint8_t RXEMPTY = 1; // MASK FOR RX BUFFER EMPTY
+const uint8_t TXFULL = 2;  // MASK FOR TX BUFFER FULL
+
 static volatile uint8_t nextValue = 0;         /* pico read-ahead value */
 static volatile uint8_t currentStatus = RXEMPTY; /* current status register value */
 

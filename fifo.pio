@@ -74,7 +74,34 @@ endPart:
 .program fifoWrite
 .define public CSW_PIN 27
 
-  wait 0 gpio CSW_PIN ;[12]   ; wait for CSW to go active (low)
-  wait 1 gpio CSW_PIN ;[12]   ; wait for CSW high (inactive)
+  wait 0 gpio CSW_PIN ; wait for CSW to go active (low)
+  wait 1 gpio CSW_PIN ; wait for CSW high (inactive)
   in pins, 16                ; grab the data CD0-7 and auto-push
+.wrap
+
+.program dmaWrite
+.define public nDACK_PIN 5
+.define public nIOW_PIN  6
+
+  wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
+  wait 0 gpio nIOW_PIN  ; wait for nIOW to go active (low)
+  wait 1 gpio nIOW_PIN  ; wait for nIOW high (inactive)
+  in pins, 16                ; grab the data CD0-7 and auto-push
+.wrap
+
+
+.program dmaRead
+.define public nDACK_PIN 5
+.define public nIOR_PIN  7
+
+.wrap_target
+  mov osr, null       ; change CD0-7 pindirs to inputs
+  out pindirs, 8
+  wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
+  wait 0 gpio nIOR_PIN  ; wait for nIOR to go active (low)
+pullLoop:
+  pull block
+  out pins, 8       ; send the data byte
+  out pindirs, 8    ; set up CD0-7 as outputs
+  wait 1 gpio nIOR_PIN  ; wait for nIOR to go active (low)
 .wrap

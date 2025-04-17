@@ -41,7 +41,10 @@
         "tusb_compiler.h": "c",
         "tusb_config.h": "c",
         "cstdlib": "cpp",
-        "tusb_common.h": "c"
+        "tusb_common.h": "c",
+        "common.h": "c",
+        "time.h": "c",
+        "gpios.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }

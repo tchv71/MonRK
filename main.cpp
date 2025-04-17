@@ -13,6 +13,10 @@
 #include "gpios.h"
 #include <hardware/vreg.h>
 #include <hardware/clocks.h>
+#include <hardware/spi.h>
+#include <common.h>
+#include "fifo.pio.h"
+
 
 #if 0
 extern void setup1() __attribute__((weak));
@@ -66,20 +70,92 @@ extern void __loop()
 }
 static struct _reent *_impure_ptr1 = nullptr;
 
-#if 0
-void main1() 
+extern "C" void main_sd();
+
+
+const uint dmaWriteSm = 0;
+const uint dmaReadSm = 1;
+
+/*
+ * Set up PIOs for pico <-> CPU interface
+ */
+void dmaPioInit()
 {
-    //rp2040.fifo.registerCore();
-    if (setup1) {
+    uint dmaWriteProgram = pio_add_program(DMA_PIO, &dmaWrite_program);
+
+    pio_sm_config writeConfig = dmaWrite_program_get_default_config(dmaWriteProgram);
+    sm_config_set_in_pins(&writeConfig, GPIO_CD7);
+    sm_config_set_in_shift(&writeConfig, false, true, 16); // L shift, autopush @ 16 bits
+    sm_config_set_clkdiv(&writeConfig, 1.0f);
+
+    pio_sm_init(DMA_PIO, dmaWriteSm, dmaWriteProgram, &writeConfig);
+    pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true);
+
+    uint dmaReadProgram = pio_add_program(DMA_PIO, &dmaRead_program);
+
+    for (uint i = 0; i < 8; ++i)
+    {
+        pio_gpio_init(DMA_PIO, GPIO_CD7 + i);
+    }
+
+    pio_sm_config readConfig = dmaRead_program_get_default_config(dmaReadProgram);
+    sm_config_set_in_pins(&readConfig, GPIO_CSR);
+    sm_config_set_out_pins(&readConfig, GPIO_CD7, 8);
+    sm_config_set_in_shift(&readConfig, false, false, 32); // L shift
+    sm_config_set_out_shift(&readConfig, true, false, 32); // R shift
+    sm_config_set_clkdiv(&readConfig, 1.0f);
+
+    pio_sm_init(DMA_PIO, dmaReadSm, dmaReadProgram, &readConfig);
+    pio_sm_set_enabled(DMA_PIO, dmaReadSm, true);
+}
+
+void setup1()
+{    
+    spi_init (SPI, BAUD);
+    spi_set_format(SPI, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+    gpio_set_function(SPI_RX, GPIO_FUNC_SPI);
+    //gpio_set_function(SPI_CSn, GPIO_FUNC_SPI);
+    gpio_set_function(SPI_SCK, GPIO_FUNC_SPI);
+    gpio_set_function(SPI_TX, GPIO_FUNC_SPI);
+
+    gpio_init (SPI_CSn);
+    gpio_put (SPI_CSn, 1);
+    gpio_set_dir (SPI_CSn, GPIO_OUT);
+ 
+    gpio_init (DRQ);
+    gpio_put (DRQ, 1);
+    gpio_set_dir (DRQ, GPIO_OUT);
+
+    gpio_init(25);
+    gpio_set_dir(25, GPIO_OUT);
+    gpio_put(25, 0);
+
+    // SD cards' DO MUST be pulled up.
+    gpio_pull_up(SPI_RX);
+
+    main_sd(); 
+}
+
+void loop1()
+{
+
+}
+
+void main1()
+{
+    // rp2040.fifo.registerCore();
+    if (setup1)
+    {
         setup1();
     }
-    while (true) {
-        if (loop1) {
+    while (true)
+    {
+        if (loop1)
+        {
             loop1();
         }
     }
 }
-#endif
 
 extern SerialUSB serial;
 /* file globals */
@@ -145,7 +221,7 @@ int main()
 #endif
 #endif
 #endif
-    // multicore_launch_core1(main1);
+    multicore_launch_core1(main1);
     setup();
     while (true)
     {

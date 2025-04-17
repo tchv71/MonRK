@@ -37,7 +37,7 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(MonRk )
-target_sources(MonRk PRIVATE main.cpp Serial.cpp RP2040USB.cpp loop.cpp)
+target_sources(MonRk PRIVATE main.cpp Serial.cpp RP2040USB.cpp loop.cpp sd.c 86rksd.c fs.c proto.c)
 
 pico_set_program_name(MonRk "MonRK")
 pico_set_program_version(MonRk "0.1")
@@ -53,6 +53,7 @@ pico_enable_stdio_usb(MonRk 0)
 target_link_libraries(MonRk
         pico_stdlib
         hardware_pio
+        hardware_spi
         tinyusb_device
         pico_multicore
         pico_unique_id
