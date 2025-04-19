@@ -2,11 +2,12 @@
 // (c) 10-05-2014 vinxru (aleksey.f.morozov@gmail.com)
 
 #include "proto.h"
+#include "pico/time.h"
 
 #ifndef USE_DMA
 void wait()
 {
-    // Ждем перепад 0->1
+    // пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ 0->1
     while(!PINC.5);
     while(PINC.5); 
     if((PINC&0x3F)==0) return;
@@ -51,11 +52,9 @@ void recvStart()
   wait ();
   DATA_BUS_IN ();
 #else
-  BYTE len[2];
   WORD l;
   recvStartNoDma();
-  dma_receive(len, 2);
-  l = (len[1] << 8) + len[0];
+  dma_receive((BYTE*)&l, 2);
   dma_receive(cmd_buf, l);
 #endif
 }

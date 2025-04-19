@@ -17,8 +17,8 @@ void send(BYTE c);
 void recvStart();
 BYTE wrecv();
 #ifdef USE_DMA
-BYTE dma_receive(BYTE* ptr1, WORD len);
-BYTE dma_send(BYTE* ptr1, WORD len);
+void dma_receive(BYTE* ptr1, WORD len);
+void dma_send(BYTE* ptr1, WORD len);
 void sendFlush();
 void recvStartNoDma();
 #endif

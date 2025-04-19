@@ -29,8 +29,8 @@ enum
 #define nIOW_MASK  (1 << nIOW)
 #define nIOR_MASK  (1 << nIOR)
 
-typedef unsigned char   BYTE;
-typedef unsigned short  WORD;
-typedef unsigned long	DWORD;
+typedef uint8_t   BYTE;
+typedef uint16_t  WORD;
+typedef uint32_t  DWORD;
 
 #endif

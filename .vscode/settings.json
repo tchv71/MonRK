@@ -44,7 +44,8 @@
         "tusb_common.h": "c",
         "common.h": "c",
         "time.h": "c",
-        "gpios.h": "c"
+        "gpios.h": "c",
+        "sync.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }
