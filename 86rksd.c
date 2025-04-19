@@ -14,6 +14,8 @@
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
 #include "hardware/sync.h"
+#include "gpios.h"
+#include "hardware/pio.h"
 
 #define O_OPEN 0
 #define O_CREATE 1
@@ -68,7 +70,7 @@ void sendBin(BYTE *p, WORD l)
     send(*p++);
 }
 
-void sendBinf(BYTE *d, BYTE l)
+void sendBinf(const BYTE *d, BYTE l)
 {
   for (; l; --l)
     send(*d++);
@@ -117,8 +119,9 @@ void readInt(char rks)
       // Посылаем адрес загрузки
       send(STA_OK_RKS);
       sendBin(buf, 2);
-      // send (STA_WAIT);
-
+#ifndef USE_DMA
+      send (STA_WAIT);
+#endif
       // Корректируем указатели
       wptr += 4;
       readedLength -= 4;
@@ -144,11 +147,13 @@ void readInt(char rks)
     sendBin((BYTE *)&readedLength, 2);
 #ifdef USE_DMA
     sendFlush();
-    dma_send(wptr, readedLength); //
+    sleep_ms(10);
+    dma_send(wptr, readedLength);
+    //BYTE i=0;//
 #else
-    sendBin(wptr, readedLength);
+    sendBin (wptr, readedLength);
+    send (STA_WAIT);
 #endif
-    // send (STA_WAIT);
   }
 
   // Если все ОК
@@ -181,8 +186,13 @@ void cmd_ver()
 void cmd_boot_exec()
 {
   // Файл по умолчанию
-  if (buf[0] == 0)
-    strcpy(buf, "boot/sdbios.rk");
+#ifndef USE_DMA
+    const char *bootSdbiosRk = "boot/sdbios.rk";
+#else
+    const char *bootSdbiosRk = "boot/sdbiosd.rkl";
+#endif
+    if (buf[0] == 0)
+      strcpy((char*) buf, /* (const char*) (nCS_GPIO_Port->IDR & nCS_Pin) ?  "boota/sdbios.rk" :  */bootSdbiosRk);
 
   // Открываем файл
   if (fs_open())
@@ -215,8 +225,10 @@ void cmd_exec()
   // Прием имени файла
   recvString();
 
+  // if ((nCS_GPIO_Port->IDR & nCS_Pin) && stricmp((char*)buf, "BOOT/SHELL.RK") == 0)
+  //   strcpy((char*)buf, "BOOTA/SHELL.RK");
   // Режим передачи и подтверждение
-  sendStart(STA_WAIT);
+  sendStart (STA_WAIT);
   if (lastError)
     return; // Переполнение строки
 
@@ -268,7 +280,7 @@ void cmd_find()
 
   for (; n; --n)
   {
-    /* Читаем очереной описатель */
+    /* Читаем очередной описатель */
     if (fs_readdir())
       return;
 
@@ -288,12 +300,12 @@ void cmd_find()
     /* Отправляем */
     send(STA_OK_ENTRY);
 #ifndef USE_DMA
-    sendBin((BYTE *)&info, sizeof(info));
+    sendBin ((BYTE*) &info, sizeof(info));
+    send (STA_WAIT);
 #else
     sendFlush();
-    dma_send((BYTE *)&info, sizeof(info));
+    dma_send((BYTE*) &info, sizeof(info));
 #endif
-    // send (STA_WAIT);
   }
 
   /* Ограничение по размеру */
@@ -490,6 +502,20 @@ void cmd_write()
 /*******************************************************************************
  * Главная процедура                                                            *
  *******************************************************************************/
+void LedOn();
+void LedOff();
+
+void error()
+{
+  for (;;)
+  {
+    LedOff();
+    sleep_ms(100);
+    LedOn();
+    sleep_ms(100);
+  }
+}
+
 void LedOff()
 {
   // Гасим светодиод
@@ -502,16 +528,6 @@ void LedOn()
   gpio_put(LED, 1);
 }
 
-void error()
-{
-  for (;;)
-  {
-    LedOff();
-    /* delay_ms */ sleep_ms(100);
-    LedOn();
-    /* delay_ms */ sleep_ms(100);
-  }
-}
 
 BYTE RkSd_Loop()
 {
@@ -521,12 +537,14 @@ BYTE RkSd_Loop()
 
     // Проверяем наличие карты
     sendStart(STA_START);
-    // send (STA_WAIT);
-    if (fs_check())
-    {
-      send(ERR_DISK_ERR);
-    }
-    else
+#ifndef USE_DMA
+    send (STA_WAIT);
+#endif
+    //if (fs_check ())
+    //{
+    //  send (ERR_DISK_ERR);
+    //}
+    //else
     {
       send(STA_OK_DISK);
       recvStart();
@@ -614,25 +632,23 @@ static inline void WRITE_DATA(BYTE c)
 {
   gpio_put_masked(GPIO_CD_MASK, ((uint32_t)c) << GPIO_CD7);
 }
+const uint dmaReadSm = 0;
+const uint dmaWriteSm = 1;
 
-BYTE dma_send(BYTE *ptr, WORD len)
+void dma_send(BYTE *ptr, WORD len)
 {
-  DATA_IN();
-  gpio_put(DRQ, 1);
-  uint32_t ints = save_and_disable_interrupts();
+  pio_gpio_init(DMA_PIO, DRQ);
+  //gpio_put(DRQ, 1);
+  pio_sm_put_blocking(DMA_PIO, dmaReadSm, 0);
+  //uint32_t ints = save_and_disable_interrupts();
   do
   {
-    while (gpio_get_all() & (nIOR_MASK | nDACK_MASK))
-      ;
-    DATA_OUT();
-    WRITE_DATA(*ptr++); // PORTD = *ptr++;
-    while (gpio_get(nIOR) == 0)
-      ;
-    DATA_IN();
+    pio_sm_put_blocking(DMA_PIO, dmaReadSm, *ptr++ | (0xFF << 8));
   } while (--len);
-  gpio_put(DRQ, 0);
-  restore_interrupts(ints);
-  return 0;
+  //gpio_put(DRQ, 0);
+  pio_sm_put_blocking(DMA_PIO, dmaReadSm, 0);
+  pio_sm_get_blocking(DMA_PIO, dmaReadSm);
+  //restore_interrupts(ints);
 }
 
 static inline BYTE READ_DATA()
@@ -640,8 +656,25 @@ static inline BYTE READ_DATA()
   return (gpio_get_all() & GPIO_CD_MASK) >> GPIO_CD7;
 }
 
-BYTE dma_receive(BYTE *ptr, WORD len)
+void dma_receive(BYTE *ptr, WORD len)
 {
+#if 1
+  // while (!pio_sm_is_rx_fifo_empty(DMA_PIO, dmaWriteSm))
+  //   pio_sm_get(DMA_PIO, dmaWriteSm);
+  pio_sm_clear_fifos(DMA_PIO, dmaWriteSm);
+  pio_sm_restart(DMA_PIO, dmaWriteSm);
+  gpio_init(DRQ);
+  gpio_set_dir(DRQ, true);
+  gpio_put(DRQ, 1);
+  pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true);
+  //pio_sm_get_blocking(DMA_PIO, dmaWriteSm);
+  do
+  {
+    *ptr++ = pio_sm_get_blocking(DMA_PIO, dmaWriteSm) & 0xFF;
+  } while (--len);
+  gpio_put(DRQ, 0);
+  pio_sm_set_enabled(DMA_PIO, dmaWriteSm, false);
+  #else
   DATA_IN();
   gpio_put(DRQ, 1);
   uint32_t ints = save_and_disable_interrupts();
@@ -655,7 +688,7 @@ BYTE dma_receive(BYTE *ptr, WORD len)
   } while (--len);
   gpio_put(DRQ, 0);
   restore_interrupts(ints);
-  return 0;
+#endif
 }
 #endif
 
@@ -664,7 +697,7 @@ void main_sd()
   DATA_IN();
   LedOn();
   // Пауза, пока не стабилизируется питание
-  /* delay_ms */ sleep_ms(500);
+  /* delay_ms */ //sleep_ms(500);
 
   // Запуск файловой системы
   if (fs_init())
@@ -683,17 +716,19 @@ void main_sd()
     if (fs_read0(rom, rom_size))
       error();
 
-    /* delay_ms */ sleep_ms(100);
+    /* delay_ms */ //sleep_ms(100);
 
     // Гасим светодиод
     LedOff();
 #if 0
-    sendStart(0x45);
-    sendFlush();
-    //dma_send(rom, rom_size);
-    //dma_receive(buf, rom_size);
-    //dma_send(buf, rom_size);
-  while (1) ;
+    //sendStart(0x45);
+    //sendFlush();
+    dma_send(rom, rom_size);
+    dma_receive(buf, rom_size);
+    dma_send(buf, rom_size);
+    static int n = 0;
+    n = memcmp(buf, rom, rom_size);
+    while (1) ;
 #endif
   }
   while (1)

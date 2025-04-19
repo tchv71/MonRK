@@ -72,9 +72,9 @@ static struct _reent *_impure_ptr1 = nullptr;
 
 extern "C" void main_sd();
 
+extern "C" const uint dmaWriteSm;
+extern "C" const uint dmaReadSm;
 
-const uint dmaWriteSm = 0;
-const uint dmaReadSm = 1;
 
 /*
  * Set up PIOs for pico <-> CPU interface
@@ -84,12 +84,13 @@ void dmaPioInit()
     uint dmaWriteProgram = pio_add_program(DMA_PIO, &dmaWrite_program);
 
     pio_sm_config writeConfig = dmaWrite_program_get_default_config(dmaWriteProgram);
+    sm_config_set_jmp_pin(&writeConfig, nDACK);
     sm_config_set_in_pins(&writeConfig, GPIO_CD7);
     sm_config_set_in_shift(&writeConfig, false, true, 16); // L shift, autopush @ 16 bits
     sm_config_set_clkdiv(&writeConfig, 1.0f);
 
     pio_sm_init(DMA_PIO, dmaWriteSm, dmaWriteProgram, &writeConfig);
-    pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true);
+    pio_sm_set_enabled(DMA_PIO, dmaWriteSm, false);
 
     uint dmaReadProgram = pio_add_program(DMA_PIO, &dmaRead_program);
 
@@ -97,13 +98,18 @@ void dmaPioInit()
     {
         pio_gpio_init(DMA_PIO, GPIO_CD7 + i);
     }
+    pio_sm_set_pins_with_mask(DMA_PIO, dmaReadSm, 0, 1u << DRQ);
+    pio_sm_set_pindirs_with_mask(DMA_PIO, dmaReadSm, 1u << DRQ, 1u << DRQ);
+    pio_gpio_init(DMA_PIO, DRQ);
 
     pio_sm_config readConfig = dmaRead_program_get_default_config(dmaReadProgram);
-    sm_config_set_in_pins(&readConfig, GPIO_CSR);
+    //sm_config_set_fifo_join(&readConfig, PIO_FIFO_JOIN_TX);
+    //sm_config_set_sideset(&readConfig, 1, true, false);
+    sm_config_set_jmp_pin(&readConfig, nDACK);
+    sm_config_set_sideset_pins(&readConfig, DRQ);
     sm_config_set_out_pins(&readConfig, GPIO_CD7, 8);
-    sm_config_set_in_shift(&readConfig, false, false, 32); // L shift
     sm_config_set_out_shift(&readConfig, true, false, 32); // R shift
-    sm_config_set_clkdiv(&readConfig, 1.0f);
+    sm_config_set_clkdiv(&readConfig, 4.0f);
 
     pio_sm_init(DMA_PIO, dmaReadSm, dmaReadProgram, &readConfig);
     pio_sm_set_enabled(DMA_PIO, dmaReadSm, true);
@@ -123,7 +129,7 @@ void setup1()
     gpio_set_dir (SPI_CSn, GPIO_OUT);
  
     gpio_init (DRQ);
-    gpio_put (DRQ, 1);
+    gpio_put (DRQ, 0);
     gpio_set_dir (DRQ, GPIO_OUT);
 
     gpio_init(25);
@@ -133,6 +139,7 @@ void setup1()
     // SD cards' DO MUST be pulled up.
     gpio_pull_up(SPI_RX);
 
+    dmaPioInit();
     main_sd(); 
 }
 
@@ -222,6 +229,8 @@ int main()
 #endif
 #endif
     multicore_launch_core1(main1);
+    // uint32_t ints = save_and_disable_interrupts();
+    // while (true) ;
     setup();
     while (true)
     {
