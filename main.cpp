@@ -180,19 +180,9 @@ extern void fifoPioInit();
 
 void setup()
 {
-    gpio_init_mask(GPIO_CD_MASK | GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
-    fifoPioInit();
+    gpio_init_mask(/* GPIO_CD_MASK | */ GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
+    //fifoPioInit();
     serial.ignoreFlowControl();
-#if 0
-    while (!serial.available()) ;
-    uint8_t *p = stream;
-    while (serial.available())
-    {
-        uint8_t c = *p++ = serial.read();
-        serial.write(c);
-    }
-    while (true) ;
-#endif
 }
 
 #define PICO_CLOCK_PLL 1260000000
@@ -232,7 +222,6 @@ int main()
 #endif
 #endif
     multicore_launch_core1(main1);
-    // uint32_t ints = save_and_disable_interrupts();
     while (true) ;
     setup();
     while (true)

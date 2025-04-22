@@ -639,27 +639,24 @@ extern int res;
 void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
 {
 #if 1
-  //pio_sm_set_pins_with_mask(DMA_PIO, dmaReadSm, 0, 1u << DRQ);
-  //pio_sm_set_pindirs_with_mask(DMA_PIO, dmaReadSm, 1u << DRQ, 1u << DRQ);
-  //pio_gpio_init(DMA_PIO, DRQ);
   gpio_init(DRQ);
   gpio_set_dir(DRQ, GPIO_OUT);
   gpio_put(DRQ, 1);
   pio_gpio_init(DMA_PIO, DIR);
+  //pio_sm_set_pins_with_mask(DMA_PIO, dmaReadSm, DIR_MASK, DIR_MASK);
   pio_sm_set_pindirs_with_mask(DMA_PIO, dmaReadSm, DIR_MASK, DIR_MASK);
-  //pio_sm_put_blocking(DMA_PIO, dmaReadSm, 0);
   //uint32_t ints = save_and_disable_interrupts();
   do
   {
     pio_sm_put_blocking(DMA_PIO, dmaReadSm, *ptr++ | (0xFF << 8));
   } while (--len);
-  //io_sm_put_blocking(DMA_PIO, dmaReadSm, 0);
   while (!pio_sm_is_tx_fifo_empty(DMA_PIO, dmaReadSm)) ;
   gpio_put(DRQ, 0);
-  //pio_sm_get_blocking(DMA_PIO, dmaReadSm);
-  pio_sm_exec_wait_blocking(DMA_PIO, dmaReadSm, pio_encode_mov(pio_isr, pio_x));
-  pio_sm_exec_wait_blocking(DMA_PIO, dmaReadSm, pio_encode_push(false, true));
-  res = -(int)pio_sm_get_blocking(DMA_PIO, dmaReadSm);
+
+  //pio_sm_exec_wait_blocking(DMA_PIO, dmaReadSm, pio_encode_mov(pio_isr, pio_x));
+  //pio_sm_exec_wait_blocking(DMA_PIO, dmaReadSm, pio_encode_push(false, true));
+  //res = -(int)pio_sm_get_blocking(DMA_PIO, dmaReadSm);
+
   //restore_interrupts(ints);
 #else
   gpio_init(DRQ);
