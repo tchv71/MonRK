@@ -634,21 +634,51 @@ static inline void WRITE_DATA(BYTE c)
 }
 const uint dmaReadSm = 0;
 const uint dmaWriteSm = 1;
+extern int res;
 
-void dma_send(BYTE *ptr, WORD len)
+void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
 {
-  pio_gpio_init(DMA_PIO, DRQ);
-  //gpio_put(DRQ, 1);
-  pio_sm_put_blocking(DMA_PIO, dmaReadSm, 0);
+#if 1
+  //pio_sm_set_pins_with_mask(DMA_PIO, dmaReadSm, 0, 1u << DRQ);
+  //pio_sm_set_pindirs_with_mask(DMA_PIO, dmaReadSm, 1u << DRQ, 1u << DRQ);
+  //pio_gpio_init(DMA_PIO, DRQ);
+  gpio_init(DRQ);
+  gpio_set_dir(DRQ, GPIO_OUT);
+  gpio_put(DRQ, 1);
+  pio_gpio_init(DMA_PIO, DIR);
+  pio_sm_set_pindirs_with_mask(DMA_PIO, dmaReadSm, DIR_MASK, DIR_MASK);
+  //pio_sm_put_blocking(DMA_PIO, dmaReadSm, 0);
   //uint32_t ints = save_and_disable_interrupts();
   do
   {
     pio_sm_put_blocking(DMA_PIO, dmaReadSm, *ptr++ | (0xFF << 8));
   } while (--len);
-  //gpio_put(DRQ, 0);
-  pio_sm_put_blocking(DMA_PIO, dmaReadSm, 0);
-  pio_sm_get_blocking(DMA_PIO, dmaReadSm);
+  //io_sm_put_blocking(DMA_PIO, dmaReadSm, 0);
+  while (!pio_sm_is_tx_fifo_empty(DMA_PIO, dmaReadSm)) ;
+  gpio_put(DRQ, 0);
+  //pio_sm_get_blocking(DMA_PIO, dmaReadSm);
+  pio_sm_exec_wait_blocking(DMA_PIO, dmaReadSm, pio_encode_mov(pio_isr, pio_x));
+  pio_sm_exec_wait_blocking(DMA_PIO, dmaReadSm, pio_encode_push(false, true));
+  res = -(int)pio_sm_get_blocking(DMA_PIO, dmaReadSm);
   //restore_interrupts(ints);
+#else
+  gpio_init(DRQ);
+  gpio_put(DRQ, 1);
+  gpio_set_dir(DRQ, GPIO_OUT);
+  uint32_t ints = save_and_disable_interrupts();
+  do
+  {
+    DATA_IN();
+    while (gpio_get_all() & (nIOR_MASK/*  | nDACK_MASK */))
+      ;
+    DATA_OUT();
+    WRITE_DATA(*ptr++); // PORTD = *ptr++;
+    while (gpio_get(nIOR) == 0)
+      ;
+  } while (--len);
+  gpio_put(DRQ, 0);
+  restore_interrupts(ints);
+#endif
 }
 
 static inline BYTE READ_DATA()
@@ -656,24 +686,25 @@ static inline BYTE READ_DATA()
   return (gpio_get_all() & GPIO_CD_MASK) >> GPIO_CD7;
 }
 
-void dma_receive(BYTE *ptr, WORD len)
+void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
 {
 #if 1
   // while (!pio_sm_is_rx_fifo_empty(DMA_PIO, dmaWriteSm))
   //   pio_sm_get(DMA_PIO, dmaWriteSm);
   pio_sm_clear_fifos(DMA_PIO, dmaWriteSm);
   pio_sm_restart(DMA_PIO, dmaWriteSm);
-  gpio_init(DRQ);
-  gpio_set_dir(DRQ, true);
+  gpio_init_mask(DRQ_MASK | (1<<DIR));
+  gpio_set_dir_out_masked(DRQ_MASK | (1<<DIR));
   gpio_put(DRQ, 1);
-  pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true);
+  gpio_put(DIR, 1);
+  //pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true);
   //pio_sm_get_blocking(DMA_PIO, dmaWriteSm);
   do
   {
     *ptr++ = pio_sm_get_blocking(DMA_PIO, dmaWriteSm) & 0xFF;
   } while (--len);
   gpio_put(DRQ, 0);
-  pio_sm_set_enabled(DMA_PIO, dmaWriteSm, false);
+  //pio_sm_set_enabled(DMA_PIO, dmaWriteSm, false);
   #else
   DATA_IN();
   gpio_put(DRQ, 1);
@@ -691,7 +722,7 @@ void dma_receive(BYTE *ptr, WORD len)
 #endif
 }
 #endif
-
+int res = 0;
 void main_sd()
 {
   DATA_IN();

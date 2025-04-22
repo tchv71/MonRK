@@ -90,26 +90,29 @@ void dmaPioInit()
     sm_config_set_clkdiv(&writeConfig, 1.0f);
 
     pio_sm_init(DMA_PIO, dmaWriteSm, dmaWriteProgram, &writeConfig);
-    pio_sm_set_enabled(DMA_PIO, dmaWriteSm, false);
+    pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true/* false */);
 
     uint dmaReadProgram = pio_add_program(DMA_PIO, &dmaRead_program);
 
     for (uint i = 0; i < 8; ++i)
     {
         pio_gpio_init(DMA_PIO, GPIO_CD7 + i);
+        //gpio_init(GPIO_CD7 + i);
     }
-    pio_sm_set_pins_with_mask(DMA_PIO, dmaReadSm, 0, 1u << DRQ);
-    pio_sm_set_pindirs_with_mask(DMA_PIO, dmaReadSm, 1u << DRQ, 1u << DRQ);
+    pio_sm_set_pins_with_mask(DMA_PIO, dmaReadSm, DIR_MASK, DRQ_MASK | DIR_MASK);
+    pio_sm_set_pindirs_with_mask(DMA_PIO, dmaReadSm, DRQ_MASK | DIR_MASK, DRQ_MASK | DIR_MASK);
     pio_gpio_init(DMA_PIO, DRQ);
+    pio_gpio_init(DMA_PIO, DIR);
 
     pio_sm_config readConfig = dmaRead_program_get_default_config(dmaReadProgram);
     //sm_config_set_fifo_join(&readConfig, PIO_FIFO_JOIN_TX);
     //sm_config_set_sideset(&readConfig, 1, true, false);
     sm_config_set_jmp_pin(&readConfig, nDACK);
     sm_config_set_sideset_pins(&readConfig, DRQ);
+    sm_config_set_set_pins(&readConfig, DIR, 1);
     sm_config_set_out_pins(&readConfig, GPIO_CD7, 8);
     sm_config_set_out_shift(&readConfig, true, false, 32); // R shift
-    sm_config_set_clkdiv(&readConfig, 4.0f);
+    sm_config_set_clkdiv(&readConfig, 1.0f);
 
     pio_sm_init(DMA_PIO, dmaReadSm, dmaReadProgram, &readConfig);
     pio_sm_set_enabled(DMA_PIO, dmaReadSm, true);
@@ -230,7 +233,7 @@ int main()
 #endif
     multicore_launch_core1(main1);
     // uint32_t ints = save_and_disable_interrupts();
-    // while (true) ;
+    while (true) ;
     setup();
     while (true)
     {
