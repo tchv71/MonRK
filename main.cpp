@@ -103,12 +103,13 @@ void dmaPioInit()
     pio_sm_set_pindirs_with_mask(DMA_PIO, dmaReadSm, DRQ_MASK | DIR_MASK, DRQ_MASK | DIR_MASK);
     pio_gpio_init(DMA_PIO, DRQ);
     pio_gpio_init(DMA_PIO, DIR);
+    pio_sm_set_consecutive_pindirs(DMA_PIO, dmaReadSm, DIR, 1, true);
 
     pio_sm_config readConfig = dmaRead_program_get_default_config(dmaReadProgram);
-    //sm_config_set_fifo_join(&readConfig, PIO_FIFO_JOIN_TX);
-    //sm_config_set_sideset(&readConfig, 1, true, false);
+    sm_config_set_fifo_join(&readConfig, PIO_FIFO_JOIN_TX);
+    sm_config_set_sideset(&readConfig, 1, true, false);
     sm_config_set_jmp_pin(&readConfig, nDACK);
-    sm_config_set_sideset_pins(&readConfig, DRQ);
+    sm_config_set_sideset_pin_base(&readConfig, DIR);
     sm_config_set_set_pins(&readConfig, DIR, 1);
     sm_config_set_out_pins(&readConfig, GPIO_CD7, 8);
     sm_config_set_out_shift(&readConfig, true, false, 32); // R shift

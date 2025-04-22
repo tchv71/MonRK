@@ -644,7 +644,6 @@ void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
   gpio_put(DRQ, 1);
   pio_gpio_init(DMA_PIO, DIR);
   //pio_sm_set_pins_with_mask(DMA_PIO, dmaReadSm, DIR_MASK, DIR_MASK);
-  pio_sm_set_pindirs_with_mask(DMA_PIO, dmaReadSm, DIR_MASK, DIR_MASK);
   //uint32_t ints = save_and_disable_interrupts();
   do
   {
