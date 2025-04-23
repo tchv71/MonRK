@@ -95,20 +95,18 @@ loop:
 .program dmaRead
 .define public nDACK_PIN 5
 .define public nIOR_PIN  7
-;.side_set 1 opt
+.side_set 1 opt
 
 start:
 .wrap_target
   mov osr, null       ; change CD0-7 pindirs to inputs
-  out pindirs, 8; side 1
-  set pins, 1
+  out pindirs, 8 side 1
   pull block
 pullLoop:
   wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
   wait 0 gpio nIOR_PIN  ; wait for nIOR to go active (low)
   jmp pin, pullLoop
   out pins, 8           ; send the data byte
-  set pins, 0
-  out pindirs, 8; side 0 ; set up CD0-7 as outputs
+  out pindirs, 8 side 0 ; set up CD0-7 as outputs
   wait 1 gpio nIOR_PIN  ; wait for nIOR to go inactive (high)
 .wrap

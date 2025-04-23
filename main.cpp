@@ -107,10 +107,10 @@ void dmaPioInit()
 
     pio_sm_config readConfig = dmaRead_program_get_default_config(dmaReadProgram);
     sm_config_set_fifo_join(&readConfig, PIO_FIFO_JOIN_TX);
-    sm_config_set_sideset(&readConfig, 1, true, false);
+    //sm_config_set_sideset(&readConfig, 1, true, false);
     sm_config_set_jmp_pin(&readConfig, nDACK);
     sm_config_set_sideset_pin_base(&readConfig, DIR);
-    sm_config_set_set_pins(&readConfig, DIR, 1);
+    //sm_config_set_set_pins(&readConfig, DIR, 1);
     sm_config_set_out_pins(&readConfig, GPIO_CD7, 8);
     sm_config_set_out_shift(&readConfig, true, false, 32); // R shift
     sm_config_set_clkdiv(&readConfig, 1.0f);
