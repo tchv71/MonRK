@@ -2,6 +2,8 @@
 #include "Serial.h"
 #include "gpios.h"
 #include "fifo.pio.h"
+#include "common.h"
+#include "hardware/sync.h"
 
 extern SerialUSB serial;
 
@@ -11,8 +13,6 @@ const uint8_t TXFULL = 2;  // MASK FOR TX BUFFER FULL
 static volatile uint8_t nextValue = 0;         /* pico read-ahead value */
 static volatile uint8_t currentStatus = RXEMPTY; /* current status register value */
 
-extern const uint fifoWriteSm = 0;
-extern const uint fifoReadSm = 1;
 
 /*
  * update the value send to the read PIO
@@ -35,12 +35,14 @@ static uint8_t *pStreamOutBufPtr;
 
 static volatile bool bFlushOutBuffer = false;
 static volatile uint8_t outLength = 0xff;
+extern "C" const uint fifoWrite2Sm;
+
 /*
  * handle interrupts from the pico<->CPU interface
  */
 void __not_in_flash_func(pio_irq_handler_write)()
 {
-    uint32_t writeVal =  FIFO_PIO->rxf[fifoWriteSm];
+    uint32_t writeVal =  DMA_PIO->rxf[fifoWrite2Sm];
 
     if ((writeVal & (GPIO_A0_MASK >> GPIO_CD7)) == 0) // write val
     {
@@ -52,28 +54,25 @@ void __not_in_flash_func(pio_irq_handler_write)()
         if (pos == outLength)
         {
             bFlushOutBuffer = true;
-            currentStatus |= RXEMPTY;
+            //currentStatus |= RXEMPTY;
         }
     }
     if (pStreamOutBufPtr == streamOutBuf + sizeof(streamOutBuf))
         currentStatus |= TXFULL;
     updateFifoReadAhead();
 }
-bool bTempBlock = false;
 
 void __not_in_flash_func(pio_irq_handler_read)()
 {
     uint32_t readVal = pio_sm_get_blocking(FIFO_PIO, fifoReadSm);//FIFO_PIO->rxf[fifoReadSm];
 
-    if ((readVal & 0x04) == 0) // read data
+    if (!(readVal &  0x80000000/* 0x04 */)) // read data
     {
         if (pStreamInBufPtr != pStreamInBufEnd)
         {
             if ((currentStatus & RXEMPTY) == 0)
             {
                 nextValue = *pStreamInBufPtr++;
-                bTempBlock = true;
-                currentStatus |= RXEMPTY;
             }
         }
         else
@@ -82,11 +81,6 @@ void __not_in_flash_func(pio_irq_handler_read)()
             pStreamInBufPtr = pStreamInBufEnd = streamInBuf;
             nextValue = 0;
         }
-    }
-    else if ((currentStatus & RXEMPTY) && bTempBlock)
-    {
-        currentStatus &= ~RXEMPTY;
-        bTempBlock = false;
     }
     updateFifoReadAhead();
 }
@@ -99,41 +93,49 @@ void fifoPioInit()
     pStreamInBufPtr = pStreamInBufEnd = streamInBuf;
     pStreamOutBufPtr = streamOutBuf;
 
-    irq_set_exclusive_handler(FIFO_IRQ, pio_irq_handler_write);
-    irq_set_enabled(FIFO_IRQ, true);
 
-    uint fifoWriteProgram = pio_add_program(FIFO_PIO, &fifoWrite_program);
-
-    pio_sm_config writeConfig = fifoWrite_program_get_default_config(fifoWriteProgram);
-    sm_config_set_in_pins(&writeConfig, GPIO_CD7);
-    sm_config_set_in_shift(&writeConfig, false, true, 16); // L shift, autopush @ 16 bits
-    sm_config_set_clkdiv(&writeConfig, 1.0f);
-
-    pio_sm_init(FIFO_PIO, fifoWriteSm, fifoWriteProgram, &writeConfig);
-    pio_sm_set_enabled(FIFO_PIO, fifoWriteSm, true);
-    pio_set_irq0_source_enabled(FIFO_PIO, pis_sm0_rx_fifo_not_empty, true);
-
-    irq_set_exclusive_handler(PIO0_IRQ_1, pio_irq_handler_read);
-    irq_set_enabled(PIO0_IRQ_1, true);
-
-    uint fifoReadProgram = pio_add_program(FIFO_PIO, &fifoRead_program);
+    int fifoReadProgOffset = pio_add_program(FIFO_PIO, &fifoRead_program);
+    if (fifoReadProgOffset<0)
+        panic("Failed add fifoReadProgram");
 
     for (uint i = 0; i < 8; ++i)
     {
         pio_gpio_init(FIFO_PIO, GPIO_CD7 + i);
     }
+    pio_gpio_init(FIFO_PIO, DIR);
+    pio_sm_set_pins_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
+    pio_sm_set_pindirs_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
+    //pio_sm_set_consecutive_pindirs(FIFO_PIO, fifoReadSm, DIR, 1, true);
 
-    pio_sm_config readConfig = fifoRead_program_get_default_config(fifoReadProgram);
-    sm_config_set_in_pins(&readConfig, GPIO_CSR);
-    sm_config_set_jmp_pin(&readConfig, GPIO_A0);
-    sm_config_set_out_pins(&readConfig, GPIO_CD7, 8);
-    sm_config_set_in_shift(&readConfig, false, false, 32); // L shift
-    sm_config_set_out_shift(&readConfig, true, false, 32); // R shift
-    sm_config_set_clkdiv(&readConfig, 4.0f);
+    pio_sm_config readFifoConfig = fifoRead_program_get_default_config(fifoReadProgOffset);
+    sm_config_set_in_pins(&readFifoConfig, GPIO_CSR);
+    sm_config_set_jmp_pin(&readFifoConfig, GPIO_A0);
+    sm_config_set_sideset_pin_base(&readFifoConfig, DIR);
+    sm_config_set_out_pins(&readFifoConfig, GPIO_CD7, 8);
+    sm_config_set_in_shift(&readFifoConfig, true, false, 32); // R shift
+    sm_config_set_out_shift(&readFifoConfig, true, false, 32); // R shift
+    sm_config_set_clkdiv(&readFifoConfig, 1.0f);
 
-    pio_sm_init(FIFO_PIO, fifoReadSm, fifoReadProgram, &readConfig);
+    pio_sm_init(FIFO_PIO, fifoReadSm, fifoReadProgOffset, &readFifoConfig);
     pio_sm_set_enabled(FIFO_PIO, fifoReadSm, true);
-    pio_set_irq1_source_enabled(FIFO_PIO, pis_sm1_rx_fifo_not_empty, true);
+    pio_set_irq0_source_enabled(FIFO_PIO, pis_sm0_rx_fifo_not_empty, true);
+    irq_set_exclusive_handler(PIO0_IRQ_0, pio_irq_handler_read);
+    irq_set_enabled(PIO0_IRQ_0, true);
+
+    irq_set_exclusive_handler(PIO1_IRQ_1, pio_irq_handler_write);
+    irq_set_enabled(PIO1_IRQ_1, true);
+    int fifoWriteProgOffset = pio_add_program(DMA_PIO, &fifoWrite_program);
+    if (fifoWriteProgOffset<0)
+        panic("Failed add fifoWriteProgram");
+
+    pio_sm_config writeConfig2 = fifoWrite_program_get_default_config(fifoWriteProgOffset);
+    sm_config_set_in_pins(&writeConfig2, GPIO_CD7);
+    sm_config_set_in_shift(&writeConfig2, false, true, 16); // L shift, autopush @ 16 bits
+    sm_config_set_clkdiv(&writeConfig2, 1.0f);
+
+    pio_sm_init(DMA_PIO, fifoWrite2Sm, fifoWriteProgOffset, &writeConfig2);
+    pio_sm_set_enabled(DMA_PIO, fifoWrite2Sm, true);
+    pio_set_irq1_source_enabled(DMA_PIO, pis_sm1_rx_fifo_not_empty, true);
 
     updateFifoReadAhead();
 }
@@ -148,14 +150,18 @@ void loop()
         {
             *pStreamInBufEnd++ = serial.read();
         }
+        uint32_t ints = save_and_disable_interrupts();
+        // if (currentStatus & RXEMPTY)
+        //     pio_sm_clear_fifos(FIFO_PIO, fifoReadSm);
         nextValue = *pStreamInBufPtr++;
         currentStatus &= ~RXEMPTY;
         outLength = 0xFF;
         updateFifoReadAhead();
+        restore_interrupts_from_disabled(ints);
     }
     if ((pStreamOutBufPtr == streamOutBuf + sizeof(streamOutBuf) || (bFlushOutBuffer && pStreamOutBufPtr != streamOutBuf)) && serial.availableForWrite())
     {
-        currentStatus = TXFULL | RXEMPTY;
+        currentStatus |= TXFULL/*  | RXEMPTY */;
         serial.write(streamOutBuf, pStreamOutBufPtr - streamOutBuf);
         serial.flush();
         pStreamOutBufPtr = streamOutBuf;

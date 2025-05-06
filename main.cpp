@@ -73,7 +73,11 @@ static struct _reent *_impure_ptr1 = nullptr;
 extern "C" void main_sd();
 
 extern "C" const uint dmaWriteSm;
-extern "C" const uint dmaReadSm;
+extern const uint dmaReadSm;
+extern "C" const uint fifoWrite2Sm;
+
+
+extern void __not_in_flash_func(pio_irq_handler_write)();
 
 
 /*
@@ -92,31 +96,24 @@ void dmaPioInit()
     pio_sm_init(DMA_PIO, dmaWriteSm, dmaWriteProgram, &writeConfig);
     pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true/* false */);
 
-    uint dmaReadProgram = pio_add_program(DMA_PIO, &dmaRead_program);
 
-    for (uint i = 0; i < 8; ++i)
-    {
-        pio_gpio_init(DMA_PIO, GPIO_CD7 + i);
-        //gpio_init(GPIO_CD7 + i);
-    }
-    pio_sm_set_pins_with_mask(DMA_PIO, dmaReadSm, DIR_MASK, DRQ_MASK | DIR_MASK);
-    pio_sm_set_pindirs_with_mask(DMA_PIO, dmaReadSm, DRQ_MASK | DIR_MASK, DRQ_MASK | DIR_MASK);
-    pio_gpio_init(DMA_PIO, DRQ);
-    pio_gpio_init(DMA_PIO, DIR);
-    pio_sm_set_consecutive_pindirs(DMA_PIO, dmaReadSm, DIR, 1, true);
+#if 1
+    int dmaReadProgOffset = pio_add_program(FIFO_PIO, &dmaRead_program);
+    if (dmaReadProgOffset<0)
+        panic("Failed add dmaReadProgram");
 
-    pio_sm_config readConfig = dmaRead_program_get_default_config(dmaReadProgram);
-    sm_config_set_fifo_join(&readConfig, PIO_FIFO_JOIN_TX);
-    //sm_config_set_sideset(&readConfig, 1, true, false);
-    sm_config_set_jmp_pin(&readConfig, nDACK);
-    sm_config_set_sideset_pin_base(&readConfig, DIR);
-    //sm_config_set_set_pins(&readConfig, DIR, 1);
-    sm_config_set_out_pins(&readConfig, GPIO_CD7, 8);
-    sm_config_set_out_shift(&readConfig, true, false, 32); // R shift
-    sm_config_set_clkdiv(&readConfig, 1.0f);
+    pio_sm_config readDmaConfig = dmaRead_program_get_default_config(dmaReadProgOffset);
+    //sm_config_set_in_pins(&readDmaConfig, GPIO_CSR);
+    sm_config_set_jmp_pin(&readDmaConfig, nDACK);
+    sm_config_set_sideset_pin_base(&readDmaConfig, DIR);
+    sm_config_set_out_pins(&readDmaConfig, GPIO_CD7, 8);
+    sm_config_set_in_shift(&readDmaConfig, true, false, 32); // R shift
+    sm_config_set_out_shift(&readDmaConfig, true, false, 32); // R shift
+    sm_config_set_clkdiv(&readDmaConfig, 1.0f);
 
-    pio_sm_init(DMA_PIO, dmaReadSm, dmaReadProgram, &readConfig);
-    pio_sm_set_enabled(DMA_PIO, dmaReadSm, true);
+    pio_sm_init(FIFO_PIO, dmaReadSm, dmaReadProgOffset, &readDmaConfig);
+    pio_sm_set_enabled(FIFO_PIO, dmaReadSm, true);
+#endif
 }
 
 void setup1()
@@ -171,9 +168,8 @@ void main1()
 extern SerialUSB serial;
 /* file globals */
 
-extern void  __not_in_flash_func(pio_irq_handler)();
-const uint fifoWriteSm = 0;
-const uint fifoReadSm = 1;
+//extern void  __not_in_flash_func(pio_irq_handler)();
+//const uint fifoWriteSm = 1;
 
 extern void fifoPioInit();
 
@@ -182,7 +178,7 @@ extern void fifoPioInit();
 void setup()
 {
     gpio_init_mask(/* GPIO_CD_MASK | */ GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
-    //fifoPioInit();
+    fifoPioInit();
     serial.ignoreFlowControl();
 }
 
@@ -223,7 +219,7 @@ int main()
 #endif
 #endif
     multicore_launch_core1(main1);
-    while (true) ;
+    //while (true) ;
     setup();
     while (true)
     {

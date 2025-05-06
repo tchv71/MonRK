@@ -632,9 +632,14 @@ static inline void WRITE_DATA(BYTE c)
 {
   gpio_put_masked(GPIO_CD_MASK, ((uint32_t)c) << GPIO_CD7);
 }
-const uint dmaReadSm = 0;
-const uint dmaWriteSm = 1;
+//const uint dmaReadSm = 0;
+const uint dmaWriteSm = 0;
+const uint dmaReadSm = 1;
+const uint fifoReadSm = 0;
+const uint fifoWrite2Sm = 1;
 extern int res;
+//extern const uint fifoWriteSm;
+extern const uint fifoReadSm;
 
 void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
 {
@@ -642,21 +647,13 @@ void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
   gpio_init(DRQ);
   gpio_set_dir(DRQ, GPIO_OUT);
   gpio_put(DRQ, 1);
-  pio_gpio_init(DMA_PIO, DIR);
-  //pio_sm_set_pins_with_mask(DMA_PIO, dmaReadSm, DIR_MASK, DIR_MASK);
-  //uint32_t ints = save_and_disable_interrupts();
+  pio_gpio_init(FIFO_PIO, DIR);
   do
   {
-    pio_sm_put_blocking(DMA_PIO, dmaReadSm, *ptr++ | (0xFF << 8));
+    pio_sm_put_blocking(FIFO_PIO, dmaReadSm, *ptr++ | (0xFF << 8));
   } while (--len);
-  while (!pio_sm_is_tx_fifo_empty(DMA_PIO, dmaReadSm)) ;
+  while (!pio_sm_is_tx_fifo_empty(FIFO_PIO, dmaReadSm)) ;
   gpio_put(DRQ, 0);
-
-  //pio_sm_exec_wait_blocking(DMA_PIO, dmaReadSm, pio_encode_mov(pio_isr, pio_x));
-  //pio_sm_exec_wait_blocking(DMA_PIO, dmaReadSm, pio_encode_push(false, true));
-  //res = -(int)pio_sm_get_blocking(DMA_PIO, dmaReadSm);
-
-  //restore_interrupts(ints);
 #else
   gpio_init(DRQ);
   gpio_put(DRQ, 1);
@@ -689,10 +686,10 @@ void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
   //   pio_sm_get(DMA_PIO, dmaWriteSm);
   pio_sm_clear_fifos(DMA_PIO, dmaWriteSm);
   pio_sm_restart(DMA_PIO, dmaWriteSm);
-  gpio_init_mask(DRQ_MASK | (1<<DIR));
-  gpio_set_dir_out_masked(DRQ_MASK | (1<<DIR));
-  gpio_put(DRQ, 1);
-  gpio_put(DIR, 1);
+  uint mask = DRQ_MASK | DIR_MASK;
+  gpio_init_mask(mask);
+  gpio_set_dir_out_masked(mask);
+  gpio_put_masked(mask, mask);
   //pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true);
   //pio_sm_get_blocking(DMA_PIO, dmaWriteSm);
   do
@@ -753,11 +750,12 @@ void main_sd()
     dma_send(rom, rom_size);
     dma_receive(buf, rom_size);
     dma_send(buf, rom_size);
-    static int n = 0;
-    n = memcmp(buf, rom, rom_size);
+    //static int n = 0;
+    //n = memcmp(buf, rom, rom_size);
     while (1) ;
 #endif
   }
+  //while (true) ;
   while (1)
   {
     if (!RkSd_Loop())

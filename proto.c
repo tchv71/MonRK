@@ -55,7 +55,7 @@ void recvStart()
   WORD l;
   recvStartNoDma();
   dma_receive((BYTE*)&l, 2);
-  dma_receive(cmd_buf, l);
+ dma_receive(cmd_buf, l);
 #endif
 }
 

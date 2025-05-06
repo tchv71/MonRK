@@ -28,24 +28,28 @@
 
 .program fifoRead
 .define public CSR_PIN 26
+.side_set 1 opt
 
   pull block
   mov x, osr        ; ensure we have a valid fifio value in x
 
 .wrap_target
-  wait 1 gpio CSR_PIN ; wait for CSR to go high (inactive) 
+start:
   mov osr, null       ; change CD0-7 pindirs to inputs
-  out pindirs, 8
+  out pindirs, 8 side 1
 
 pullLoop:
-  pull noblock      ; continuously empty the tx fifo
+  pull noblock        ; continuously empty the tx fifo
   mov x, osr        ; since we want the latest value
+
   mov isr, null
   in pins, 1        ; hacky way to jmp based on the CSR pin
   mov y, isr        ; since we can only have one jmp pin
   jmp y--, pullLoop ; still 1? loop, otherwise, let's read
 
-  jmp pin readStatus  ; if 'mode' is high, read status bits
+  ;wait 0 gpio CSR_PIN ; wait for CSR to go low (active)
+
+  jmp pin readStatus; if 'mode' is high, read status bits
 readData:
   out pins, 8       ; mode is low, send the data byte
   out null, 8
@@ -53,11 +57,28 @@ readData:
 readStatus:  
   out null, 8       ; skip data bits
   out pins, 8       ; output the status byte
-  ;mov isr, x        ; make this status value available
 endPart:
-  out pindirs, 8    ; set up CD0-7 as outputs
+  out pindirs, 8 side 0   ; set up CD0-7 as outputs
   in pins, 3        ; push CSR, CSW and MODE back through fifo
-  push              ; push ^^^ back to cpu to process
+  push noblock      ; push ^^^ back to cpu to process
+  wait 1 gpio CSR_PIN ; wait for CSR to go high (inactive) 
+.wrap
+
+.program dmaRead
+.define public nDACK_PIN 5
+.define public nIOR_PIN  7
+.side_set 1 opt
+.wrap_target
+  mov osr, null       ; change CD0-7 pindirs to inputs
+  out pindirs, 8 side 1
+  pull block
+pullLoop2:
+  wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
+  wait 0 gpio nIOR_PIN  ; wait for nIOR to go active (low)
+  jmp pin, pullLoop2
+  out pins, 8           ; send the data byte
+  out pindirs, 8 side 0 ; set up CD0-7 as outputs
+  wait 1 gpio nIOR_PIN  ; wait for nIOR to go inactive (high)
 .wrap
 
 ; -----------------------------------------------------------------------------
@@ -91,22 +112,3 @@ loop:
   in pins, 16                ; grab the data CD0-7 and auto-push
 .wrap
 
-
-.program dmaRead
-.define public nDACK_PIN 5
-.define public nIOR_PIN  7
-.side_set 1 opt
-
-start:
-.wrap_target
-  mov osr, null       ; change CD0-7 pindirs to inputs
-  out pindirs, 8 side 1
-  pull block
-pullLoop:
-  wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
-  wait 0 gpio nIOR_PIN  ; wait for nIOR to go active (low)
-  jmp pin, pullLoop
-  out pins, 8           ; send the data byte
-  out pindirs, 8 side 0 ; set up CD0-7 as outputs
-  wait 1 gpio nIOR_PIN  ; wait for nIOR to go inactive (high)
-.wrap
