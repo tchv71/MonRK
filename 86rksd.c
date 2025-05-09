@@ -653,7 +653,10 @@ void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
     pio_sm_put_blocking(FIFO_PIO, dmaReadSm, *ptr++ | (0xFF << 8));
   } while (--len);
   while (!pio_sm_is_tx_fifo_empty(FIFO_PIO, dmaReadSm)) ;
+  //sleep_ms(1);
   gpio_put(DRQ, 0);
+  //while (gpio_get(DIR)==1) ;
+  //while (gpio_get(DIR)==0) ;
 #else
   gpio_init(DRQ);
   gpio_put(DRQ, 1);
@@ -684,12 +687,13 @@ void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
 #if 1
   // while (!pio_sm_is_rx_fifo_empty(DMA_PIO, dmaWriteSm))
   //   pio_sm_get(DMA_PIO, dmaWriteSm);
-  pio_sm_clear_fifos(DMA_PIO, dmaWriteSm);
-  pio_sm_restart(DMA_PIO, dmaWriteSm);
+
+  //pio_sm_clear_fifos(DMA_PIO, dmaWriteSm);
+  //pio_sm_restart(DMA_PIO, dmaWriteSm);
   uint mask = DRQ_MASK | DIR_MASK;
   gpio_init_mask(mask);
-  gpio_set_dir_out_masked(mask);
   gpio_put_masked(mask, mask);
+  gpio_set_dir_out_masked(mask);
   //pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true);
   //pio_sm_get_blocking(DMA_PIO, dmaWriteSm);
   do

@@ -7,7 +7,7 @@
 #ifndef USE_DMA
 void wait()
 {
-    // ���� ������� 0->1
+    // Ждем перепад 0->1
     while(!PINC.5);
     while(PINC.5); 
     if((PINC&0x3F)==0) return;
@@ -55,7 +55,7 @@ void recvStart()
   WORD l;
   recvStartNoDma();
   dma_receive((BYTE*)&l, 2);
- dma_receive(cmd_buf, l);
+  dma_receive(cmd_buf, l);
 #endif
 }
 
