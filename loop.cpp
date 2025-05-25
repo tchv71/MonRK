@@ -150,14 +150,14 @@ void loop()
         {
             *pStreamInBufEnd++ = serial.read();
         }
-        uint32_t ints = save_and_disable_interrupts();
+        //uint32_t ints = save_and_disable_interrupts();
         // if (currentStatus & RXEMPTY)
         //     pio_sm_clear_fifos(FIFO_PIO, fifoReadSm);
         nextValue = *pStreamInBufPtr++;
         currentStatus &= ~RXEMPTY;
         outLength = 0xFF;
+        //restore_interrupts_from_disabled(ints);
         updateFifoReadAhead();
-        restore_interrupts_from_disabled(ints);
     }
     if ((pStreamOutBufPtr == streamOutBuf + sizeof(streamOutBuf) || (bFlushOutBuffer && pStreamOutBufPtr != streamOutBuf)) && serial.availableForWrite())
     {
