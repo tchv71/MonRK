@@ -4,6 +4,22 @@
 #include "fifo.pio.h"
 #include "common.h"
 #include "hardware/sync.h"
+#include "proto.h"
+#include "port_common.h"
+
+#include "socket.h"
+#include "wizchip_conf.h"
+extern "C"
+{
+#include "w5x00_spi.h"
+#include "timer.h"
+#include <time.h>
+}
+#include "sntp.h"
+#include "hardware/rtc.h"
+
+#include "ftpd.h"
+#include "pico/multicore.h"
 
 extern SerialUSB serial;
 
@@ -140,9 +156,215 @@ void fifoPioInit()
     updateFifoReadAhead();
 }
 
+/* Clock */
+#define PLL_SYS_KHZ (133 * 1000)
+/* Clock */
+static void set_clock_khz(void)
+{
+    // set a system clock frequency in khz
+    set_sys_clock_khz(PLL_SYS_KHZ, true);
+
+    // configure the specified clock
+    clock_configure(
+        clk_peri,
+        0,                                                // No glitchless mux
+        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
+        PLL_SYS_KHZ * 1000,                               // Input frequency
+        PLL_SYS_KHZ * 1000                                // Output (must be same as no divider)
+    );
+}
+/* Network */
+static wiz_NetInfo g_net_info =
+{
+    .mac = {0x00, 0x08, 0xDC, 0x12, 0x34, 0x56}, // MAC address
+    .ip = {192, 168, 31, 250},                   // IP address
+    .sn = {255, 255, 255, 0},                    // Subnet Mask
+    .gw = {192, 168, 31, 1},                     // Gateway
+    .dns = {192, 168, 31, 1},                    // DNS server
+    .dhcp = NETINFO_STATIC                       // DHCP enable/disable
+};
+
+uint8_t s = 0;
+const uint16_t SOCKET_PORT = 1243;
+
+/* Buffer */
+#define ETHERNET_BUF_MAX_SIZE (1024 * 2)
+/* Socket */
+#define SOCKET_SNTP 1
+
+/* Timeout */
+#define RECV_TIMEOUT (1000 * 10) // 10 seconds
+
+/* Timezone */
+#define TIMEZONE 29 //40 // Korea
+
+
+/* SNTP */
+static uint8_t g_sntp_buf[ETHERNET_BUF_MAX_SIZE] = {
+    0,
+};
+static uint8_t g_sntp_server_ip[4] = {216, 239, 35, 0}; // time.google.com
+
+/* Timer */
+static volatile uint32_t g_msec_cnt = 0;
+
+/* Timer */
+static void repeating_timer_callback(void)
+{
+    g_msec_cnt++;
+}
+
+static time_t millis(void)
+{
+    return g_msec_cnt;
+}
+
+
+/* FTP */
+static uint8_t g_ftp_buf[ETHERNET_BUF_MAX_SIZE] = {
+    0,
+};
+
+extern "C"
+{
+uint8_t Calendar_GetDayWeek (RTC_DateTypeDef thisDate);
+void toRTC_Date(const  datetime_t * t, RTC_DateTypeDef *rt);
+}
+void networkInit()
+{
+    //set_clock_khz();
+
+    //stdio_init_all();
+
+    wizchip_spi_initialize();
+    wizchip_cris_initialize();
+
+    wizchip_reset();
+    wizchip_initialize();
+    wizchip_check();
+
+    network_initialize(g_net_info);
+    uint8_t res = socket(s, Sn_MR_TCP, SOCKET_PORT, 0);
+
+    wizchip_1ms_timer_initialize(repeating_timer_callback);
+
+    network_initialize(g_net_info);
+
+    SNTP_init(SOCKET_SNTP, g_sntp_server_ip, TIMEZONE, g_sntp_buf);
+    uint8_t retval = 0;
+    uint32_t start_ms = millis();
+    datetime time;
+
+    /* Get time */
+    do
+    {
+        retval = SNTP_run(&time);
+
+        if (retval == 1)
+        {
+            break;
+        }
+    } while ((millis() - start_ms) < RECV_TIMEOUT);
+
+    if (retval != 1)
+    {
+        printf(" SNTP failed : %d\n", retval);
+
+        while (1)
+            ;
+    }
+
+    //printf(" %d-%d-%d, %d:%d:%d\n", time.yy, time.mo, time.dd, time.hh, time.mm, time.ss);
+
+    datetime_t t;
+    t.day = time.dd;
+    t.year = time.yy;
+    t.month = time.mo;
+    t.hour = time.hh;
+    t.min = time.mm;
+    t.sec = time.ss;
+    RTC_DateTypeDef sDate;
+    toRTC_Date(&t, &sDate);
+    t.dotw = Calendar_GetDayWeek(sDate);
+     // Start the RTC
+    rtc_init();
+    rtc_set_datetime(&t);
+
+    ftpd_init(g_net_info.ip);
+
+    /* Get network information */
+    print_network_information(g_net_info);
+    multicore_fifo_pop_blocking();
+}
+
+const uint16_t DATA_BUF_SIZE = sizeof(streamInBuf);
+bool bSockEstablished = false;
+
 void loop()
 {
-    if (serial.available() && ((currentStatus & TXFULL) == 0) && pStreamInBufPtr==pStreamInBufEnd)
+    uint8_t retval;
+    /* Run FTP server */
+    if ((retval = ftpd_run(g_ftp_buf)) < 0)
+    {
+        printf(" FTP server error : %d\n", retval);
+
+        while (1)
+            ;
+    }
+    {
+        switch (getSn_SR(s))
+        {
+        case SOCK_ESTABLISHED:
+            // Interrupt clear
+            if (getSn_IR(s) & Sn_IR_CON)
+            {
+                setSn_IR(s, Sn_IR_CON);
+            }
+            bSockEstablished = true;
+            uint16_t len;
+            if ((len = getSn_RX_RSR(s)) > 0 && pStreamInBufEnd == pStreamInBufPtr)
+            {
+                pStreamInBufEnd = pStreamInBufPtr = streamInBuf;
+                if (len > DATA_BUF_SIZE)
+                    len = DATA_BUF_SIZE;
+                len = recv(s, (uint8_t *)streamInBuf, len);
+                pStreamInBufEnd = pStreamInBufPtr + len;
+            }
+            if (len>0)
+            {
+                nextValue = *pStreamInBufPtr++;
+                currentStatus &= ~RXEMPTY;
+                outLength = 0xFF;
+                // restore_interrupts_from_disabled(ints);
+                updateFifoReadAhead();
+            }
+            break;
+		case SOCK_CLOSE_WAIT:
+#ifdef _HTTPSERVER_DEBUG_
+		printf("> HTTPSocket[%d] : ClOSE_WAIT\r\n", s);	// if a peer requests to close the current connection
+#endif
+			disconnect(s);
+            bSockEstablished = false;
+			break;
+
+		case SOCK_CLOSED:
+            socket(s, Sn_MR_TCP, SOCKET_PORT, 0);
+			break;
+
+		case SOCK_INIT:
+			listen(s);
+			break;
+
+		case SOCK_LISTEN:
+			break;
+
+		default :
+			break;
+        
+        }
+
+    }
+    if (false && serial.available() && ((currentStatus & TXFULL) == 0) && pStreamInBufPtr == pStreamInBufEnd)
     {
         if (pStreamInBufEnd == pStreamInBufPtr)
             pStreamInBufEnd = pStreamInBufPtr = streamInBuf;
@@ -159,11 +381,24 @@ void loop()
         //restore_interrupts_from_disabled(ints);
         updateFifoReadAhead();
     }
-    if ((pStreamOutBufPtr == streamOutBuf + sizeof(streamOutBuf) || (bFlushOutBuffer && pStreamOutBufPtr != streamOutBuf)) && serial.availableForWrite())
+
+    if ((pStreamOutBufPtr == streamOutBuf + sizeof(streamOutBuf) || (bFlushOutBuffer && pStreamOutBufPtr != streamOutBuf)) /* && serial.availableForWrite() */)
     {
         currentStatus |= TXFULL/*  | RXEMPTY */;
-        serial.write(streamOutBuf, pStreamOutBufPtr - streamOutBuf);
-        serial.flush();
+        uint16_t len;
+        if (0)
+        {
+            serial.write(streamOutBuf, pStreamOutBufPtr - streamOutBuf);
+            serial.flush();
+        }
+        else if (bSockEstablished && (len = getSn_TX_FSR(s))>0)
+        {
+            uint16_t size = pStreamOutBufPtr - streamOutBuf;
+            if (len > size)
+              len = size;
+            send(s, streamOutBuf, len);
+        }
+        else return;
         pStreamOutBufPtr = streamOutBuf;
         currentStatus &= ~TXFULL;
         bFlushOutBuffer = false;

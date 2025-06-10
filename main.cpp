@@ -118,8 +118,8 @@ void dmaPioInit()
 
 void setup1()
 {    
-    spi_init (SPI, BAUD);
-    spi_set_format(SPI, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+    spi_init (_SPI, BAUD);
+    spi_set_format(_SPI, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
     gpio_set_function(SPI_RX, GPIO_FUNC_SPI);
     //gpio_set_function(SPI_CSn, GPIO_FUNC_SPI);
     gpio_set_function(SPI_SCK, GPIO_FUNC_SPI);
@@ -168,18 +168,15 @@ void main1()
 extern SerialUSB serial;
 /* file globals */
 
-//extern void  __not_in_flash_func(pio_irq_handler)();
-//const uint fifoWriteSm = 1;
-
 extern void fifoPioInit();
-
-//uint8_t stream[100];
+extern void networkInit();
 
 void setup()
 {
     gpio_init_mask(/* GPIO_CD_MASK | */ GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
     fifoPioInit();
     serial.ignoreFlowControl();
+    networkInit();
 }
 
 #define PICO_CLOCK_PLL 1260000000

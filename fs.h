@@ -18,6 +18,8 @@ Version 1.0 10-05-2014
 #define _FS_H_
 
 #include "common.h"
+#define _MAX_SS		512
+#define FF_MAX_SS	512
 
 /* Disable checking and kill the file system */
 /* С помощью этого макроса можно отключить проверки, что бы сэкономить ПЗУ и убить файловую систему.*/
@@ -130,6 +132,7 @@ BYTE fs_write_end();
 
 BYTE fs_open();                                  /* Открыть файл */
 BYTE fs_opendir();                               /* Открыть папку */
+BYTE fs_close();
 #define fs_openany()    fs_open0(OPENED_NONE)    /* Открыть файл или папку */
 #define fs_create()     fs_open0(OPENED_FILE)    /* Создать файл */
 #define fs_createdir()  fs_open0(OPENED_DIR)     /* Создать папку */

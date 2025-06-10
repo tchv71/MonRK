@@ -35,14 +35,14 @@ static void SD_CS_ENABLE()
 {
     gpio_put(SPI_CSn, 0);
     uint8_t fill = SPI_FILL_CHAR;
-    spi_write_blocking(SPI, &fill, 1);
+    spi_write_blocking(_SPI, &fill, 1);
   }
 
 static void SD_CS_DISABLE()
 {
   gpio_put(SPI_CSn, 1);
   uint8_t fill = SPI_FILL_CHAR;
-  spi_write_blocking(SPI, &fill, 1);
+  spi_write_blocking(_SPI, &fill, 1);
 }
 /* Совместимость с разными версиями CodeVisionAVR */
 #ifndef SPI2X
@@ -64,13 +64,13 @@ static void SD_CS_DISABLE()
 
 static void spi_transmit(BYTE data)
 {
-  spi_write_blocking(SPI, &data, 1);
+  spi_write_blocking(_SPI, &data, 1);
 }
 
 static BYTE spi_receive()
 {
   BYTE data;
-  spi_read_blocking(SPI, 0xff, &data, 1);
+  spi_read_blocking(_SPI, 0xff, &data, 1);
   return data;
 }
 
@@ -200,9 +200,9 @@ BYTE sd_init()
   /* Освобождаем CS на всякий случай */
   SD_CS_DISABLE();
 
-  /* Включаем SPI */
+  /* Включаем _SPI */
   //SPI_INIT
-  spi_set_baudrate(SPI, 400 * 1000);
+  spi_set_baudrate(_SPI, 400 * 1000);
   /* Делаем несколько попыток инициализации */
   tries = 10;
   while (sd_init_int())
@@ -214,7 +214,7 @@ BYTE sd_init()
 
   /* Включаем максимальную скорость */
   //SPI_HIGHSPEED
-  spi_set_baudrate(SPI, 10 * 1000 * 1000);
+  spi_set_baudrate(_SPI, 10 * 1000 * 1000);
 
   return 0;
 }

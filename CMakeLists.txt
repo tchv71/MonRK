@@ -15,9 +15,9 @@ if(WIN32)
 else()
     set(USERHOME $ENV{HOME})
 endif()
-set(sdkVersion 2.1.1)
-set(toolchainVersion 14_2_Rel1)
-set(picotoolVersion 2.1.1)
+set(sdkVersion 2.1.0)
+set(toolchainVersion 13_3_Rel1)
+set(picotoolVersion 2.1.0)
 set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
     include(${picoVscode})
@@ -34,10 +34,14 @@ project(MonRk C CXX ASM)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+
+add_subdirectory(WIZnet-PICO-C)
+
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(MonRk )
-target_sources(MonRk PRIVATE main.cpp Serial.cpp RP2040USB.cpp loop.cpp sd.c 86rksd.c fs.c proto.c)
+target_sources(MonRk PRIVATE main.cpp Serial.cpp RP2040USB.cpp loop.cpp sd.c 86rksd.c fs.c proto.c WIZnet-PICO-C/port/ioLibrary_Driver/src/w5x00_spi.c
+)
 
 pico_set_program_name(MonRk "MonRK")
 pico_set_program_version(MonRk "0.1")
@@ -50,13 +54,20 @@ pico_enable_stdio_uart(MonRk 0)
 pico_enable_stdio_usb(MonRk 0)
 
 # Add the standard library to the build
-target_link_libraries(MonRk
+target_link_libraries(MonRk PRIVATE
         pico_stdlib
         hardware_pio
         hardware_spi
+        hardware_dma
+        hardware_rtc
         tinyusb_device
         pico_multicore
         pico_unique_id
+        IOLIBRARY_FILES
+        ETHERNET_FILES
+        SNTP_FILES
+        FTPSERVER_FILES
+        TIMER_FILES
         )
 
 # Add the standard include files to the build

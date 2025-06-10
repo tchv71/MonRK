@@ -16,6 +16,9 @@
 #include "hardware/sync.h"
 #include "gpios.h"
 #include "hardware/pio.h"
+#include "hardware/rtc.h"
+#include "pico/multicore.h"
+
 
 #define O_OPEN 0
 #define O_CREATE 1
@@ -31,7 +34,7 @@
 #define STA_OK_ENTRY 0x45
 #define STA_OK_WRITE 0x46
 #define STA_OK_RKS 0x47
-#define STA_DATETIME 0x50
+#define ERR_DATETIME 0x50
 #define STA_OK_BLOCK 0x4F
 
 BYTE buf[512];
@@ -67,13 +70,13 @@ void recvString()
 void sendBin(BYTE *p, WORD l)
 {
   for (; l; l--)
-    send(*p++);
+    sendByte(*p++);
 }
 
 void sendBinf(const BYTE *d, BYTE l)
 {
   for (; l; --l)
-    send(*d++);
+    sendByte(*d++);
 }
 
 /*******************************************************************************
@@ -117,10 +120,10 @@ void readInt(char rks)
       buf[3] = tmp;
 
       // Посылаем адрес загрузки
-      send(STA_OK_RKS);
+      sendByte(STA_OK_RKS);
       sendBin(buf, 2);
 #ifndef USE_DMA
-      send (STA_WAIT);
+      sendByte (STA_WAIT);
 #endif
       // Корректируем указатели
       wptr += 4;
@@ -143,7 +146,7 @@ void readInt(char rks)
     }
 
     // Отправляем блок
-    send(STA_OK_BLOCK);
+    sendByte(STA_OK_BLOCK);
     sendBin((BYTE *)&readedLength, 2);
 #ifdef USE_DMA
     sendFlush();
@@ -152,7 +155,7 @@ void readInt(char rks)
     //BYTE i=0;//
 #else
     sendBin (wptr, readedLength);
-    send (STA_WAIT);
+    sendByte (STA_WAIT);
 #endif
   }
 
@@ -298,10 +301,10 @@ void cmd_find()
     // memcpy(memcpy(memcpy(info.fname, FS_DIRENTRY+DIR_Name, 12, FS_DIRENTRY+DIR_FileSize, 4), FS_DIRENTRY+DIR_WrtTime, 4);
 
     /* Отправляем */
-    send(STA_OK_ENTRY);
+    sendByte(STA_OK_ENTRY);
 #ifndef USE_DMA
     sendBin ((BYTE*) &info, sizeof(info));
-    send (STA_WAIT);
+    sendByte (STA_WAIT);
 #else
     sendFlush();
     dma_send((BYTE*) &info, sizeof(info));
@@ -420,7 +423,7 @@ void cmd_lseek()
   }
 
   // Передаем результат
-  send(STA_OK_CMD);
+  sendByte(STA_OK_CMD);
   sendBin((BYTE *)&fs_tmp, 4);
   lastError = 0; // На всякий случай, результат уже передан
 }
@@ -481,7 +484,7 @@ void cmd_write()
       return;
 
     // Принимаем от компьютера блок данных
-    send(STA_OK_WRITE);
+    sendByte(STA_OK_WRITE);
     sendBin((BYTE *)&fs_file_wlen, 2);
 #ifndef USE_DMA
     recvStart();
@@ -498,6 +501,200 @@ void cmd_write()
 
   lastError = STA_OK_CMD;
 }
+
+typedef struct
+{
+  uint8_t Hours;            /*!< Specifies the RTC Time Hour.
+                                 This parameter must be a number between Min_Data = 0 and Max_Data = 12 if the RTC_HourFormat_12 is selected
+                                 This parameter must be a number between Min_Data = 0 and Max_Data = 23 if the RTC_HourFormat_24 is selected */
+
+  uint8_t Minutes;          /*!< Specifies the RTC Time Minutes.
+                                 This parameter must be a number between Min_Data = 0 and Max_Data = 59 */
+
+  uint8_t Seconds;          /*!< Specifies the RTC Time Seconds.
+                                 This parameter must be a number between Min_Data = 0 and Max_Data = 59 */
+
+  uint8_t TimeFormat;       /*!< Specifies the RTC AM/PM Time.
+                                 This parameter can be a value of @ref RTC_AM_PM_Definitions */
+
+  uint32_t SubSeconds;      /*!< Specifies the RTC_SSR RTC Sub Second register content.
+                                 This parameter corresponds to a time unit range between [0-1] Second
+                                 with [1 Sec / SecondFraction +1] granularity */
+
+  uint32_t SecondFraction;  /*!< Specifies the range or granularity of Sub Second register content
+                                 corresponding to Synchronous prescaler factor value (PREDIV_S)
+                                 This parameter corresponds to a time unit range between [0-1] Second
+                                 with [1 Sec / SecondFraction +1] granularity.
+                                 This field will be used only by HAL_RTC_GetTime function */
+
+  uint32_t DayLightSaving;  /*!< This interface is deprecated. To manage Daylight
+                                 Saving Time, please use HAL_RTC_DST_xxx functions */
+
+  uint32_t StoreOperation;  /*!< This interface is deprecated. To manage Daylight
+                                 Saving Time, please use HAL_RTC_DST_xxx functions */
+} RTC_TimeTypeDef;
+
+
+
+//extern RTC_HandleTypeDef hrtc;
+
+static const uint8_t list_mth[12] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+
+uint8_t Calendar_GetDayWeek (RTC_DateTypeDef thisDate)
+{
+	uint8_t ret = 0;
+    if(thisDate.Month < 3){
+    	thisDate.Year -= 1;
+    }
+    ret = (uint8_t)((thisDate.Year + (thisDate.Year/4) - (thisDate.Year/100) + (thisDate.Year/400) + list_mth[thisDate.Month-1] + thisDate.Date) % 7);
+	return (ret);
+}
+
+void toDatetime(const RTC_DateTypeDef *rt, datetime_t * t)
+{
+  if (!t || !rt)
+    return;
+  t->day = rt->Date;
+  t->month = rt->Month;
+  t->dotw = rt->WeekDay;
+  t->year = rt->Year + 20000;
+}
+
+void toDatetimeT(const RTC_TimeTypeDef *rt, datetime_t * t)
+{
+  if (!t || !rt)
+    return;
+  t->sec = rt->Seconds;
+  t->min = rt->Minutes;
+  t->hour = rt->Hours;
+}
+
+void toRTC_Date(const  datetime_t * t, RTC_DateTypeDef *rt)
+{
+  if (!t || !rt)
+    return;
+  rt->Date    = t->day  ;
+  rt->Month   = t->month;
+  rt->WeekDay = t->dotw ;
+  rt->Year    = t->year - 2000 ;
+}
+
+void toRTC_Time(const  datetime_t * t, RTC_TimeTypeDef *rt)
+{
+  if (!t || !rt)
+    return;
+  rt->Hours   = t->hour ;
+  rt->Minutes = t->min;
+  rt->Seconds = t->sec;
+  rt->SecondFraction = 255 ;
+  rt->SubSeconds = 0;
+}
+/*******************************************************************************
+ * Получить дату                                                                *
+ *******************************************************************************/
+void cmd_get_date()
+{
+  sendStart(STA_WAIT);
+  RTC_DateTypeDef sDate={0};
+  datetime_t t;
+  if (!rtc_get_datetime(&t))
+  {
+    lastError = ERR_DATETIME;
+    return;
+
+  }
+  toRTC_Date(&t, &sDate);
+  sendBin((BYTE*)&sDate, sizeof(sDate));
+  sendByte(STA_OK_CMD);
+  lastError = 0;//STA_OK_CMD;
+}
+
+
+/*******************************************************************************
+ * Установить дату                                                              *
+ *******************************************************************************/
+void cmd_set_date()
+{
+  RTC_DateTypeDef sDate={0};
+  //recvStart();
+  sDate.WeekDay = wrecv();
+  sDate.Month = wrecv();
+  sDate.Date = wrecv();
+  sDate.Year = wrecv();
+  sDate.WeekDay = Calendar_GetDayWeek(sDate);
+
+  // Режим передачи и подтверждение
+  sendStart (STA_WAIT);
+  datetime_t t;
+  if (!rtc_get_datetime(&t))
+  {
+    lastError = ERR_DATETIME;
+    return;
+
+  }
+  toDatetime(&sDate, &t);
+
+  if (!rtc_set_datetime(&t))
+  {
+    lastError = ERR_DATETIME;
+    return;
+  }
+  //send (STA_OK_CMD);
+  lastError = STA_OK_CMD;
+}
+
+/*******************************************************************************
+ * Получить время                                                               *
+ *******************************************************************************/
+void cmd_get_time()
+{
+  sendStart(STA_WAIT);
+  RTC_TimeTypeDef sTime={0};
+
+  datetime_t t;
+  if (!rtc_get_datetime(&t))
+  {
+    lastError = ERR_DATETIME;
+    return;
+
+  }
+  toRTC_Time(&t, &sTime);
+  sendBin((BYTE*)&sTime, 3);
+  sendBin((BYTE*)&sTime.SecondFraction,1);
+  sendBin((BYTE*)&sTime.SubSeconds,1);
+  sendByte(STA_OK_CMD);
+  lastError = 0;//STA_OK_CMD;
+}
+
+/*******************************************************************************
+ * Установить время                                                               *
+ *******************************************************************************/
+void cmd_set_time()
+{
+  RTC_TimeTypeDef sTime={0};
+  sTime.Hours = wrecv();
+  sTime.Minutes = wrecv();
+  sTime.Seconds = wrecv();
+  sTime.SecondFraction = wrecv();
+  sTime.SubSeconds = wrecv();
+  datetime_t t;
+  if (!rtc_get_datetime(&t))
+  {
+    lastError = ERR_DATETIME;
+    return;
+
+  }
+  toDatetimeT(&sTime, &t);
+
+  if (!rtc_set_datetime(&t))
+  {
+    lastError = ERR_DATETIME;
+    return;
+  }
+  //send (STA_OK_CMD);
+  lastError = STA_OK_CMD;
+}
+
 
 /*******************************************************************************
  * Главная процедура                                                            *
@@ -538,15 +735,15 @@ BYTE RkSd_Loop()
     // Проверяем наличие карты
     sendStart(STA_START);
 #ifndef USE_DMA
-    send (STA_WAIT);
+    sendByte (STA_WAIT);
 #endif
     //if (fs_check ())
     //{
-    //  send (ERR_DISK_ERR);
+    //  sendByte (ERR_DISK_ERR);
     //}
     //else
     {
-      send(STA_OK_DISK);
+      sendByte(STA_OK_DISK);
       recvStart();
       c = wrecv();
       // Зажигаем светодиод
@@ -588,26 +785,26 @@ BYTE RkSd_Loop()
       case 9:
         LedOff();
         return 0;
-#if 0
-	case 0x2A:
-	  cmd_get_date();
-	  break;
-	case 0x2B:
-	  cmd_set_date();
-	  break;
-	case 0x2C:
-	  cmd_get_time();
-	  break;
-	case 0x2D:
-	  cmd_set_time();
-	  break;
+#if 1
+      case 0x2A:
+        cmd_get_date();
+        break;
+      case 0x2B:
+        cmd_set_date();
+        break;
+      case 0x2C:
+        cmd_get_time();
+        break;
+      case 0x2D:
+        cmd_set_time();
+        break;
 #endif
       default:
         lastError = ERR_INVALID_COMMAND;
       }
 
       // Вывод ошибки
-      if (lastError)
+      if (lastError && c != STA_START) 
         sendStart(lastError);
 #ifdef USE_DMA
       sendFlush();
@@ -730,6 +927,8 @@ void main_sd()
   // Запуск файловой системы
   if (fs_init())
     error();
+  multicore_fifo_push_blocking(0);
+  while (true) ;
   strcpy(buf, "boot/boot.rk");
   if (fs_open())
     error();

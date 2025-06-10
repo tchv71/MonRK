@@ -13,14 +13,31 @@
 void wait();
 #endif
 void sendStart(BYTE c); 
-void send(BYTE c);
+void sendByte(BYTE c);
 void recvStart();
 BYTE wrecv();
 #ifdef USE_DMA
-void dma_receive(BYTE* ptr1, WORD len);
-void dma_send(BYTE* ptr1, WORD len);
+void __not_in_flash_func(dma_receive)(BYTE* ptr1, WORD len);
+void __not_in_flash_func(dma_send)(BYTE* ptr1, WORD len);
 void sendFlush();
 void recvStartNoDma();
 #endif
+/**
+  * @brief  RTC Date structure definition
+  */
+typedef struct
+{
+  uint8_t WeekDay;  /*!< Specifies the RTC Date WeekDay.
+                         This parameter can be a value of @ref RTC_WeekDay_Definitions */
 
+  uint8_t Month;    /*!< Specifies the RTC Date Month (in BCD format).
+                         This parameter can be a value of @ref RTC_Month_Date_Definitions */
+
+  uint8_t Date;     /*!< Specifies the RTC Date.
+                         This parameter must be a number between Min_Data = 1 and Max_Data = 31 */
+
+  uint8_t Year;     /*!< Specifies the RTC Date Year.
+                         This parameter must be a number between Min_Data = 0 and Max_Data = 99 */
+
+} RTC_DateTypeDef;
 #endif

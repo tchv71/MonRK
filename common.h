@@ -4,7 +4,10 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include <pico.h>
+#include <stdint.h>//<pico.h>
+#include <pico/types.h>
+#include <sys/cdefs.h>
+#include <pico/platform/sections.h>
 
 #define CONST
 #define USE_DMA 1
@@ -16,7 +19,7 @@ enum
     SPI_SCK = 10,
     SPI_TX  = 11
 }; 
-#define SPI spi1
+#define _SPI spi1
 #define BAUD (1000*1000)
 #define DRQ   4
 #define nDACK 5
