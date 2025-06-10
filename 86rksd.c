@@ -18,6 +18,7 @@
 #include "hardware/pio.h"
 #include "hardware/rtc.h"
 #include "pico/multicore.h"
+#include "pico/sync.h"
 
 
 #define O_OPEN 0
@@ -731,7 +732,6 @@ BYTE RkSd_Loop()
   BYTE c;
   // while (1)
   {
-
     // Проверяем наличие карты
     sendStart(STA_START);
 #ifndef USE_DMA
@@ -752,6 +752,7 @@ BYTE RkSd_Loop()
       // Сбрасываем ошибку
       lastError = 0;
 
+      mutex_enter_blocking(get_sd_mutex());
       // Принимаем аргументы
       switch (c)
       {
@@ -819,6 +820,7 @@ BYTE RkSd_Loop()
 
     // Гасим светодиод
     LedOff();
+    mutex_exit(get_sd_mutex());
     return 1;
   }
 }
@@ -916,6 +918,14 @@ void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
 #endif
 }
 #endif
+
+auto_init_mutex(sd_mutex);
+mutex_t* get_sd_mutex()
+{
+  return &sd_mutex;
+}
+
+
 int res = 0;
 void main_sd()
 {
@@ -928,25 +938,26 @@ void main_sd()
   if (fs_init())
     error();
   multicore_fifo_push_blocking(0);
-  while (true) ;
-  strcpy(buf, "boot/boot.rk");
-  if (fs_open())
-    error();
-  if (fs_getfilesize())
-    error();
-  if (fs_tmp < 7)
-    error();
-  if (fs_tmp > 128)
-    error();
   {
-    WORD rom_size = (WORD)fs_tmp;
-    if (fs_read0(rom, rom_size))
+    mutex_enter_blocking(&sd_mutex);
+    strcpy(buf, "boot/boot.rk");
+    if (fs_open())
       error();
+    if (fs_getfilesize())
+      error();
+    if (fs_tmp < 7)
+      error();
+    if (fs_tmp > 128)
+      error();
+    {
+      WORD rom_size = (WORD)fs_tmp;
+      if (fs_read0(rom, rom_size))
+        error();
 
-    /* delay_ms */ //sleep_ms(100);
+      /* delay_ms */ // sleep_ms(100);
 
-    // Гасим светодиод
-    LedOff();
+      // Гасим светодиод
+      LedOff();
 #if 0
     //sendStart(0x45);
     //sendFlush();
@@ -957,6 +968,8 @@ void main_sd()
     //n = memcmp(buf, rom, rom_size);
     while (1) ;
 #endif
+    }
+    mutex_exit(&sd_mutex);
   }
   //while (true) ;
   while (1)

@@ -20,6 +20,7 @@ extern "C"
 
 #include "ftpd.h"
 #include "pico/multicore.h"
+#include "pico/sync.h"
 
 extern SerialUSB serial;
 
@@ -303,6 +304,7 @@ bool bSockEstablished = false;
 void loop()
 {
     uint8_t retval;
+    mutex_enter_blocking(get_sd_mutex());
     /* Run FTP server */
     if ((retval = ftpd_run(g_ftp_buf)) < 0)
     {
@@ -311,6 +313,7 @@ void loop()
         while (1)
             ;
     }
+    mutex_exit(get_sd_mutex());
     {
         switch (getSn_SR(s))
         {

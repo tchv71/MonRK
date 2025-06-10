@@ -8,6 +8,7 @@
 #include <pico/types.h>
 #include <sys/cdefs.h>
 #include <pico/platform/sections.h>
+#include <pico/sync.h>
 
 #define CONST
 #define USE_DMA 1
@@ -38,4 +39,11 @@ typedef uint8_t   BYTE;
 typedef uint16_t  WORD;
 typedef uint32_t  DWORD;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+mutex_t* get_sd_mutex();
+#ifdef __cplusplus
+}
+#endif
 #endif
