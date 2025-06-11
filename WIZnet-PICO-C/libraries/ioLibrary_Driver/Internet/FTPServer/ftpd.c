@@ -53,6 +53,8 @@ static char *commands[] = {
 	"size",
 	"mlsd",
 	"appe",
+	"rnfr",
+	"rnto",
 	NULL
 };
 
@@ -328,8 +330,13 @@ int get_filesize(char* path, char *filename)
 	return -1;
 }
 
-void set_fullpath(const char *arg)
+void set_fullpath(char *arg)
 {
+	size_t slen = strlen(arg);
+	if (arg[slen - 2] == '\r')
+		arg[slen - 2] = 0x00;
+	if (arg[slen - 1] == '\n')
+		arg[slen - 1] = 0x00;
 	strcpy(buf, ftp.workingdir);
 	if (strcmp(buf, "/") == 0)
 		buf[0] = 0;
@@ -900,9 +907,45 @@ char proc_ftpd(char * ftp_buf)
 				sprintf(ftp.filename, "/%s", arg);
 			else
 				sprintf(ftp.filename, "%s/%s", ftp.workingdir, arg);
-			slen = sprintf(sendbuf, "150 Opening data channel for file downloand from server of \"%s\"\r\n", ftp.filename);
+			slen = sprintf(sendbuf, "150 Opening data channel for file download from server of \"%s\"\r\n", ftp.filename);
 			send(CTRL_SOCK, (uint8_t *)sendbuf, slen);
 			ftp.current_cmd = RETR_CMD;
+			break;
+
+		case RNFR_CMD:
+			set_fullpath(arg);
+			strcpy(ftp.filename, buf);
+			if (fs_openany() != 0)
+			{
+				slen = sprintf(sendbuf, "550 File does not exist\r\n");
+			}
+			else
+			{
+				slen = sprintf(sendbuf, "350 File exists, ready for destination name.\r\n");
+				//strcpy(ftp.workingdir, arg);
+			}
+			send(CTRL_SOCK, (uint8_t *)sendbuf, slen);
+			ftp.current_cmd = RNFR_CMD;
+			break;
+
+		case RNTO_CMD:
+			strcpy(buf, ftp.filename);
+			ftp.fr = fs_openany();
+			if (ftp.fr == 0)
+			{
+				set_fullpath(arg);
+				ftp.fr = fs_move0();
+			}
+			if (ftp.fr != 0)
+			{
+				slen = sprintf(sendbuf, "550 Unknown error.\r\n");
+			}
+			else
+			{
+				slen = sprintf(sendbuf, "250 File or directory renamed successfully.\r\n");
+			}
+			send(CTRL_SOCK, (uint8_t *)sendbuf, slen);
+			ftp.current_cmd = RNTO_CMD;
 			break;
 
 		case APPE_CMD :

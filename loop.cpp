@@ -189,7 +189,7 @@ uint8_t s = 0;
 const uint16_t SOCKET_PORT = 1243;
 
 /* Buffer */
-#define ETHERNET_BUF_MAX_SIZE (1024 * 2)
+#define ETHERNET_BUF_MAX_SIZE (1024 * 16)
 /* Socket */
 #define SOCKET_SNTP 1
 

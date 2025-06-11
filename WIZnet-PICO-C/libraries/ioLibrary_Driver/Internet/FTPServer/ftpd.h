@@ -77,6 +77,8 @@ enum ftp_cmd {
 	SIZE_CMD,
 	MLSD_CMD,
 	APPE_CMD,
+	RNFR_CMD,
+	RNTO_CMD,
 	NO_CMD,
 };
 
