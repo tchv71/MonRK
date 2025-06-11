@@ -29,6 +29,8 @@ CON,PRN,AUX,CLOCK$,NUL,COM1,COM2,COM3,COM4,LPT1,LPT2,LPT3
 #include "fs.h"
 #include "sd.h"
 #include <string.h>
+#include "pico/time.h"
+#include "hardware/rtc.h"
 
 /* Для наглядности */
 
@@ -103,6 +105,14 @@ File fs_secondFile;
 #define BPB_RootClus 44
 #define BS_FilSysType32 82
 #define MBR_Table 446
+
+//extern RTC_HandleTypeDef hrtc;
+enum {
+  TS_WRT=1,
+  TS_CRT=2
+};
+
+static void fs_set_entry_timestamp(BYTE *entry, BYTE whichTs);
 
 /**************************************************************************
  *  Чтение сектора в буфер                                                 *
@@ -884,6 +894,7 @@ static BYTE fs_open0_create(BYTE dir)
   memset(allocatedEntry, 0, 32);
   memcpy(allocatedEntry, new_name, 11);
 
+  fs_set_entry_timestamp (allocatedEntry, TS_WRT | TS_CRT);
   if (!dir)
   {
     /* Сохраняем описатель на диск */
@@ -1107,6 +1118,32 @@ abort:
 //   return fs_read0(ptr, len);
 // }
 
+static void fs_set_entry_timestamp(BYTE *entry, BYTE whichTs)
+{
+  datetime_t t;
+  if (rtc_get_datetime(&t))
+  {
+    if (t.year<2000)
+      t.year -= 1900;
+    else
+      t.year -= 2000;
+    WORD time = t.sec / 2 | (t.min << 5) | (t.hour << 11);
+    WORD date = t.day | (t.month << 5)
+	| ((t.year >= 80 ? t.year - 80 : t.year + 20) << 9);
+    if (whichTs & TS_WRT)
+    {
+      LD_WORD(entry + DIR_WrtTime) = time;
+      LD_WORD(entry + DIR_WrtDate) = date;
+    }
+    if (whichTs & TS_CRT)
+    {
+      LD_WORD(entry + DIR_CrtTime) = time;
+      LD_WORD(entry + DIR_CrtDate) = date;
+    }
+  }
+}
+
+
 /**************************************************************************
  *  Сохранить длину файла и превый кластер в опистаель                     *
  *  Вызывается из fs_lseek, fs_write_start, fs_write_end, fs_write_eof     *
@@ -1128,7 +1165,8 @@ static char fs_saveFileLength()
   LD_DWORD(entry + DIR_FileSize) = fs_file.size;
   fs_setEntryCluster(entry, fs_file.entry_start_cluster);
 
-  return sd_writeBuf(fs_file.entry_sector);
+  fs_set_entry_timestamp (entry, TS_WRT);
+  return sd_writeBuf (fs_file.entry_sector);
 }
 
 /**************************************************************************

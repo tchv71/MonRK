@@ -50,7 +50,8 @@
         "sntp.h": "c",
         "proto.h": "c",
         "ftpd.h": "c",
-        "multicore.h": "c"
+        "multicore.h": "c",
+        "gpio.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }

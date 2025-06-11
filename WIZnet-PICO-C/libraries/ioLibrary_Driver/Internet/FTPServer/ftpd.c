@@ -250,7 +250,10 @@ FRESULT scan_files(char *path, char *buf1, int *buf_len)
 				temp_dir = '-';
 				// printf("%s/%s : \t\t %dbyte\r\n", path, fn,fno.fsize);
 			}
-			len = sprintf(p_buf, "%crwxr-xr-x 1 ftp ftp %d %s %d %d %s\r\n", temp_dir, fno.fsize, temp_mon[((fno.fdate >> 5) & 0x0f) - 1], (fno.fdate & 0x1f), (((fno.fdate >> 9) & 0x7f) + 1980), fn);
+			uint8_t h = fno.ftime >> 11;
+			uint8_t m = (fno.ftime >> 5)%64;
+			len = sprintf(p_buf, "%crwxr-xr-x 1 ftp ftp %d %s %d %d %d:%.2d %s\r\n", temp_dir, fno.fsize, temp_mon[((fno.fdate >> 5) & 0x0f) - 1], (fno.fdate & 0x1f), (((fno.fdate >> 9) & 0x7f) + 1980),
+			  h, m, fn);
 			printf("mon = %d, day = %d,  year = %d \r\n", ((fno.fdate >> 5) & 0x0f) - 1, (fno.fdate & 0x1f), (((fno.fdate >> 9) & 0x7f) + 1980));
 			printf("buf[%d]:%s", len, p_buf);
 			p_buf += len;
@@ -638,9 +641,9 @@ uint8_t ftpd_run(uint8_t * dbuf)
 #endif
     				}
 
-    				//fno.fdate = (WORD)(((current_year - 1980) << 9) | (current_month << 5) | current_day);
-    				//fno.ftime = (WORD)((current_hour << 11) | (current_min << 5) | (current_sec >> 1));
-    				//f_utime((const char *)ftp.filename, &fno);
+    				// fno.fdate = (WORD)(((current_year - 1980) << 9) | (current_month << 5) | current_day);
+    				// fno.ftime = (WORD)((current_hour << 11) | (current_min << 5) | (current_sec >> 1));
+    				// f_utime((const char *)ftp.filename, &fno);
 #else
 					while(1){
 						if((remain_datasize = getSn_RX_RSR(DATA_SOCK)) > 0){
