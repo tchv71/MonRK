@@ -494,7 +494,13 @@ uint8_t ftpd_run(uint8_t * dbuf)
     					size = sprintf(dbuf, "drwxr-xr-x 1 ftp ftp 0 Dec 31 2014 $Recycle.Bin\r\n-rwxr-xr-x 1 ftp ftp 512 Dec 31 2014 test.txt\r\n");
 #endif
     				size = strlen(dbuf);
-    				send(DATA_SOCK, dbuf, size);
+					char* pData = dbuf;
+					while (size>0)
+					{
+    					int sent = send(DATA_SOCK, pData, size);
+						size -= sent;
+						pData += sent;
+					}
     				ftp.current_cmd = NO_CMD;
     				disconnect(DATA_SOCK);
     				size = sprintf(dbuf, "226 Successfully transferred \"%s\"\r\n", ftp.workingdir);
