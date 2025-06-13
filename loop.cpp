@@ -236,6 +236,7 @@ void networkInit()
     //set_clock_khz();
 
     //stdio_init_all();
+    multicore_fifo_drain();
 
     wizchip_spi_initialize();
     wizchip_cris_initialize();
@@ -304,7 +305,8 @@ bool bSockEstablished = false;
 void loop()
 {
     uint8_t retval;
-    mutex_enter_blocking(get_sd_mutex());
+#if 1
+    //mutex_enter_blocking(get_sd_mutex());
     /* Run FTP server */
     if ((retval = ftpd_run(g_ftp_buf)) < 0)
     {
@@ -313,7 +315,9 @@ void loop()
         while (1)
             ;
     }
-    mutex_exit(get_sd_mutex());
+    //mutex_exit(get_sd_mutex());
+#endif
+    if (1)
     {
         switch (getSn_SR(s))
         {
@@ -343,9 +347,6 @@ void loop()
             }
             break;
 		case SOCK_CLOSE_WAIT:
-#ifdef _HTTPSERVER_DEBUG_
-		printf("> HTTPSocket[%d] : ClOSE_WAIT\r\n", s);	// if a peer requests to close the current connection
-#endif
 			disconnect(s);
             bSockEstablished = false;
 			break;

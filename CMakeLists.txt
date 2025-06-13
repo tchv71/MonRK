@@ -40,7 +40,7 @@ add_subdirectory(WIZnet-PICO-C)
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(MonRk )
-target_sources(MonRk PRIVATE main.cpp Serial.cpp RP2040USB.cpp loop.cpp sd.c 86rksd.c fs.c proto.c WIZnet-PICO-C/port/ioLibrary_Driver/src/w5x00_spi.c
+target_sources(MonRk PRIVATE main.cpp Serial.cpp RP2040USB.cpp loop.cpp sd.c 86rksd.c fs.c proto.c WIZnet-PICO-C/port/ioLibrary_Driver/src/w5x00_spi.c usb_msc_driver.c
 )
 
 pico_set_program_name(MonRk "MonRK")

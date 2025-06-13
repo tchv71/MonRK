@@ -16,12 +16,10 @@
 #include <hardware/spi.h>
 #include <common.h>
 #include "fifo.pio.h"
+#include "pico/sync.h"
 
 
-#if 0
-extern void setup1() __attribute__((weak));
-extern void loop1() __attribute__((weak));
-#endif
+
 extern void setup();
 extern void loop();
 
@@ -55,7 +53,8 @@ extern void __loop()
     yield();
 #endif
 
-    if (arduino::serialEventRun)
+    tud_task(); // tinyusb device task
+    if (false && arduino::serialEventRun)
     {
         arduino::serialEventRun();
     }
@@ -203,8 +202,11 @@ int main()
     TinyUSB_Device_Init(0);
 
 #else
+#endif
+#endif
+    multicore_launch_core1(main1);
+    setup();
     __USBStart();
-
 #ifndef DISABLE_USB_SERIAL
 
     if (!__isFreeRTOS)
@@ -213,11 +215,9 @@ int main()
         serial.begin(115200);
     }
 #endif
-#endif
-#endif
-    multicore_launch_core1(main1);
+
     //while (true) ;
-    setup();
+    //setup();
     while (true)
     {
         tight_loop_contents();

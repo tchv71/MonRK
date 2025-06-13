@@ -801,6 +801,7 @@ int Stream::findMulti(struct Stream::MultiTarget *targets, int tCount)
 #ifndef DISABLE_USB_SERIAL
 // Ensure we are installed in the USB chain
 void __USBInstallSerial() { /* noop */ }
+//void __USBInstallMassStorage() { /* noop */ }
 #endif
 
 // SerialEvent functions are weak, so when the user doesn't define them,

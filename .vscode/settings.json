@@ -51,7 +51,8 @@
         "proto.h": "c",
         "ftpd.h": "c",
         "multicore.h": "c",
-        "gpio.h": "c"
+        "gpio.h": "c",
+        "spi_sd.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }

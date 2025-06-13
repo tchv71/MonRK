@@ -436,6 +436,7 @@ extern "C" void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_r
     (void) bufsize;
 }
 
+#if 0
 extern "C" int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize) __attribute__((weak));
 extern "C" int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize) {
     (void) lun;
@@ -485,7 +486,7 @@ extern "C" void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8], uint8_t pr
     product_id[0] = 0;
     product_rev[0] = 0;
 }
-
+#endif
 
 
 #ifdef ENABLE_PICOTOOL_USB
