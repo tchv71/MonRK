@@ -588,9 +588,11 @@ uint8_t ftpd_run(uint8_t *dbuf)
 #endif
 #if defined(F_FILESYSTEM)
 			strcpy(buf, ftp.filename);
+			fs_delete();
+			strcpy(buf, ftp.filename);
 			ftp.fr = fs_create(); // f_open(&(ftp.fil), (const char *)ftp.filename, FA_CREATE_ALWAYS | FA_WRITE);
 			// print_filedsc(&(ftp.fil));
-			if (ftp.fr == FR_OK)
+						if (ftp.fr == FR_OK)
 			{
 #if defined(_FTP_DEBUG_)
 				printf("f_open return FR_OK\r\n");
@@ -670,7 +672,7 @@ uint8_t ftpd_run(uint8_t *dbuf)
 #endif
 				ftp.current_cmd = NO_CMD;
 				disconnect(DATA_SOCK);
-				size = sprintf(dbuf, "226 Successfully transferred \"%s\"\r\n", ftp.filename);
+				size = sprintf(dbuf, "550 No such file or directory.\r\n");
 				send(CTRL_SOCK, dbuf, size);
 				break;
 			}
@@ -711,7 +713,7 @@ uint8_t ftpd_run(uint8_t *dbuf)
 #endif
 			ftp.current_cmd = NO_CMD;
 			disconnect(DATA_SOCK);
-			size = sprintf(dbuf, "550 No such file or directory.\r\n");
+			size = sprintf(dbuf, "226 Successfully transferred \"%s\"\r\n", ftp.filename);
 			send(CTRL_SOCK, dbuf, size);
 			break;
 
@@ -1088,7 +1090,11 @@ char proc_ftpd(char *ftp_buf)
 			tmpstr = strrchr(arg, '/');
 			*tmpstr = 0;
 #if defined(F_FILESYSTEM)
-			strcpy(buf, arg);
+			if (strlen(ftp.workingdir) == 1)
+				sprintf(ftp.filename, "/%s", arg);
+			else
+				sprintf(ftp.filename, "%s/%s", ftp.workingdir, arg);
+			strcpy(buf, ftp.filename[0] == '/' ? ftp.filename + 1 : ftp.filename);
 			fs_open();
 			fs_getfilesize(); // get_filesize(arg, tmpstr + 1);
 			slen = fs_tmp;
