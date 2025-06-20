@@ -27,8 +27,8 @@ extern SerialUSB serial;
 const uint8_t RXEMPTY = 1; // MASK FOR RX BUFFER EMPTY
 const uint8_t TXFULL = 2;  // MASK FOR TX BUFFER FULL
 
-static volatile uint8_t nextValue = 0;         /* pico read-ahead value */
-static volatile uint8_t currentStatus = RXEMPTY; /* current status register value */
+volatile uint8_t nextValue = 0;         /* pico read-ahead value */
+volatile uint8_t currentStatus = RXEMPTY; /* current status register value */
 
 
 /*
@@ -79,11 +79,25 @@ void __not_in_flash_func(pio_irq_handler_write)()
     updateFifoReadAhead();
 }
 
+//     1   1   2   2   3   3   0   0
+//     0   0   0   0   0   0   1   1
+// B   _______|_______|_______|_______|_______|_______|
+
+// MODE_ 1 _ 0 _ 1 _ 0 _ 1 _ 0 _ 1 _ 0 _ 1 _ 0 _ 1 _ 0 _
+// RD   |_| |_| |_| |_| |_| |_| |_| |_| |_| |_| |_| |_|
+
+//         1       2       3       -       -
+// D   -------+-------+-------+-------+-------+-------+--
+
+//         0       0       0      1
+// RXE -------+-------+-------+-------+-------+-------+--
+//
+
 void __not_in_flash_func(pio_irq_handler_read)()
 {
     uint32_t readVal = pio_sm_get_blocking(FIFO_PIO, fifoReadSm);//FIFO_PIO->rxf[fifoReadSm];
 
-    if (!(readVal &  0x80000000/* 0x04 */)) // read data
+    if (!(readVal &  0x80000000)) // read data (MODE bit==0)
     {
         if (pStreamInBufPtr != pStreamInBufEnd)
         {
@@ -94,9 +108,11 @@ void __not_in_flash_func(pio_irq_handler_read)()
         }
         else
         {
-            currentStatus |= RXEMPTY;
-            pStreamInBufPtr = pStreamInBufEnd = streamInBuf;
+            currentStatus = currentStatus | RXEMPTY;
+            //pStreamInBufPtr = pStreamInBufEnd = streamInBuf;
             nextValue = 0;
+            updateFifoReadAhead();
+            return;
         }
     }
     updateFifoReadAhead();
@@ -317,9 +333,11 @@ void loop()
     }
     //mutex_exit(get_sd_mutex());
 #endif
+    static uint8_t res;
+    static uint16_t len;
     if (1)
     {
-        switch (getSn_SR(s))
+        switch ((res = getSn_SR(s)))
         {
         case SOCK_ESTABLISHED:
             // Interrupt clear
@@ -328,22 +346,30 @@ void loop()
                 setSn_IR(s, Sn_IR_CON);
             }
             bSockEstablished = true;
-            uint16_t len;
-            if ((len = getSn_RX_RSR(s)) > 0 && pStreamInBufEnd == pStreamInBufPtr)
+            while ((len = getSn_RX_RSR(s)) > 0/*  && pStreamInBufEnd == pStreamInBufPtr */)
             {
-                pStreamInBufEnd = pStreamInBufPtr = streamInBuf;
+                //pStreamInBufEnd = pStreamInBufPtr = streamInBuf;
                 if (len > DATA_BUF_SIZE)
                     len = DATA_BUF_SIZE;
-                len = recv(s, (uint8_t *)streamInBuf, len);
-                pStreamInBufEnd = pStreamInBufPtr + len;
-            }
-            if (len>0)
-            {
-                nextValue = *pStreamInBufPtr++;
-                currentStatus &= ~RXEMPTY;
-                outLength = 0xFF;
-                // restore_interrupts_from_disabled(ints);
-                updateFifoReadAhead();
+                ptrdiff_t bufferRemains = (streamInBuf + sizeof(streamInBuf)) - (pStreamInBufEnd + len);
+                if (bufferRemains >= 0)
+                    len = recv(s, pStreamInBufEnd, len);
+                else
+                {
+                    recv(s, pStreamInBufEnd, len + bufferRemains);
+                    recv(s, streamInBuf, -bufferRemains);
+                }
+                //uint32_t ints = save_and_disable_interrupts();
+                //pStreamInBufPtr = streamInBuf;
+                pStreamInBufEnd = streamInBuf + (pStreamInBufEnd - streamInBuf + len) % sizeof(streamInBuf);
+                if (len>0 && (currentStatus & RXEMPTY) != 0)
+                {
+                    nextValue = *pStreamInBufPtr++;
+                    currentStatus &= ~RXEMPTY;
+                    outLength = 0xFF;
+                    updateFifoReadAhead();
+                }
+                //restore_interrupts_from_disabled(ints);
             }
             break;
 		case SOCK_CLOSE_WAIT:
@@ -368,7 +394,7 @@ void loop()
         }
 
     }
-    if (false && serial.available() && ((currentStatus & TXFULL) == 0) && pStreamInBufPtr == pStreamInBufEnd)
+    if (!bSockEstablished && serial.available() && ((currentStatus & TXFULL) == 0) && pStreamInBufPtr == pStreamInBufEnd)
     {
         if (pStreamInBufEnd == pStreamInBufPtr)
             pStreamInBufEnd = pStreamInBufPtr = streamInBuf;
@@ -390,7 +416,7 @@ void loop()
     {
         currentStatus |= TXFULL/*  | RXEMPTY */;
         uint16_t len;
-        if (0)
+        if (!bSockEstablished)
         {
             serial.write(streamOutBuf, pStreamOutBufPtr - streamOutBuf);
             serial.flush();

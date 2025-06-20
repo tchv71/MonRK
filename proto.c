@@ -21,8 +21,8 @@ void wait()
 enum DMA_MODE { DM_NONE = 0, DM_SEND, DM_RECEIVE} dm_mode;
 BYTE cmd_buf_send[32];
 BYTE cmd_buf_recv[32];
-BYTE* cmd_buf_send_ptr;
-BYTE* cmd_buf_recv_ptr;
+BYTE* cmd_buf_send_ptr = cmd_buf_send;
+BYTE* cmd_buf_recv_ptr = cmd_buf_recv;
 #endif
 
 void sendStart(BYTE c)
