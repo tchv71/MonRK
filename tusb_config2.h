@@ -36,15 +36,15 @@
 
 // CDC FIFO size of TX and RX
 #ifndef CFG_TUD_CDC_RX_BUFSIZE
-#define CFG_TUD_CDC_RX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)
+#define CFG_TUD_CDC_RX_BUFSIZE   (512)
 #endif
 #ifndef CFG_TUD_CDC_TX_BUFSIZE
-#define CFG_TUD_CDC_TX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)
+#define CFG_TUD_CDC_TX_BUFSIZE   (512)
 #endif
 
 // CDC Endpoint transfer buffer size, more is faster
 #ifndef CFG_TUD_CDC_EP_BUFSIZE
-#define CFG_TUD_CDC_EP_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)
+#define CFG_TUD_CDC_EP_BUFSIZE   (512)
 #endif
 
 // We use a vendor specific interface but with our own driver
