@@ -179,7 +179,9 @@ void setup()
     gpio_init_mask(/* GPIO_CD_MASK | */ GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
     fifoPioInit();
     //serial.ignoreFlowControl();
+#if USE_ETHERNET
     networkInit();
+#endif
 }
 
 #define PICO_CLOCK_PLL 1260000000
@@ -194,8 +196,8 @@ int main()
     stdio_init_all();
     //stdio_set_translate_crlf(&stdio_usb, false);
 
-    multicore_launch_core1(main1);
     setup();
+    multicore_launch_core1(main1);
     //__USBStart();
 
     //while (true) ;

@@ -366,7 +366,7 @@ public:
 void loop()
 {
     uint8_t retval;
-#if 1
+#if USE_ETHERNET
     //mutex_enter_blocking(get_sd_mutex());
     /* Run FTP server */
     if ((retval = ftpd_run(g_ftp_buf)) < 0)
@@ -380,7 +380,7 @@ void loop()
 #endif
     static uint8_t res;
     static uint16_t len;
-    if (1)
+#if USE_ETHERNET
     {
         switch ((res = getSn_SR(s)))
         {
@@ -439,6 +439,7 @@ void loop()
         }
 
     }
+#endif
     if (!bSockEstablished && serial.available() && ((currentStatus & TXFULL) == 0) /* && pStreamInBufPtr == pStreamInBufEnd */)
     {
         if (pStreamInBufEnd == pStreamInBufPtr)
@@ -466,6 +467,7 @@ void loop()
             serial.write(streamOutBuf, pStreamOutBufPtr - streamOutBuf);
             serial.flush();
         }
+#if USE_ETHERNET
         else if (bSockEstablished && (len = getSn_TX_FSR(s))>0)
         {
             uint16_t size = pStreamOutBufPtr - streamOutBuf;
@@ -473,6 +475,7 @@ void loop()
               len = size;
             send(s, streamOutBuf, len);
         }
+#endif
         else return;
         pStreamOutBufPtr = streamOutBuf;
         currentStatus &= ~TXFULL;
