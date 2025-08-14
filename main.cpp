@@ -7,9 +7,9 @@
 #include "sys/reent.h"
 #include <cstdlib>
 #include <cstring>
-#include "tusb.h"
-#include "RP2040USB.h"
-#include "Serial.h"
+//#include "tusb.h"
+//#include "RP2040USB.h"
+//#include "Serial.h"
 #include "gpios.h"
 #include <hardware/vreg.h>
 #include <hardware/clocks.h>
@@ -49,6 +49,7 @@ void yield()
 
 extern void __loop()
 {
+#if 0
 #ifdef USE_TINYUSB
     yield();
 #endif
@@ -66,6 +67,7 @@ extern void __loop()
         arduino::serialEvent2Run();
     }
 #endif
+#endif
 }
 static struct _reent *_impure_ptr1 = nullptr;
 
@@ -81,6 +83,8 @@ extern void __not_in_flash_func(pio_irq_handler_write)();
 
 /*
  * Set up PIOs for pico <-> CPU interface
+ * FIFO pio for read-like programs
+ * DMA pio for write-like due to the same used pins
  */
 void dmaPioInit()
 {
@@ -164,7 +168,7 @@ void main1()
     }
 }
 
-extern SerialUSB serial;
+//extern SerialUSB serial;
 /* file globals */
 
 extern void fifoPioInit();
@@ -174,7 +178,7 @@ void setup()
 {
     gpio_init_mask(/* GPIO_CD_MASK | */ GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
     fifoPioInit();
-    serial.ignoreFlowControl();
+    //serial.ignoreFlowControl();
     networkInit();
 }
 
@@ -188,40 +192,18 @@ int main()
     set_sys_clock_pll(PICO_CLOCK_PLL, PICO_CLOCK_PLL_DIV1, PICO_CLOCK_PLL_DIV2); // 252000
 
     stdio_init_all();
-    // Allocate impure_ptr (newlib temps) if there is a 2nd core running
-    // Let rest of core know if we're using FreeRTOS
-    bool __isFreeRTOS = false;
-#if 0
-    if (!__isFreeRTOS && (setup1 || loop1)) {
-        _impure_ptr1 = (struct _reent*)calloc(1, sizeof(struct _reent));
-        _REENT_INIT_PTR(_impure_ptr1);
-    }
-#endif
-#ifndef NO_USB
-#ifdef USE_TINYUSB
-    TinyUSB_Device_Init(0);
+    //stdio_set_translate_crlf(&stdio_usb, false);
 
-#else
-#endif
-#endif
     multicore_launch_core1(main1);
     setup();
-    __USBStart();
-#ifndef DISABLE_USB_SERIAL
-
-    if (!__isFreeRTOS)
-    {
-        // Enable serial port for reset/upload always
-        serial.begin(115200);
-    }
-#endif
+    //__USBStart();
 
     //while (true) ;
     //setup();
     while (true)
     {
-        tight_loop_contents();
+        //tight_loop_contents();
         loop();
-        __loop();
+        //_loop();
     }
 }

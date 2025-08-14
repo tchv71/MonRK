@@ -839,23 +839,28 @@ const uint fifoWrite2Sm = 1;
 extern int res;
 //extern const uint fifoWriteSm;
 extern const uint fifoReadSm;
+//#define INTS_OFF 1
 
 void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
 {
 #if 1
   gpio_init(DRQ);
-  gpio_set_dir(DRQ, GPIO_OUT);
   gpio_put(DRQ, 1);
+  gpio_set_dir(DRQ, GPIO_OUT);
   pio_gpio_init(FIFO_PIO, DIR);
+#ifdef INTS_OFF
+  uint32_t ints = save_and_disable_interrupts();
+#endif
   do
   {
     pio_sm_put_blocking(FIFO_PIO, dmaReadSm, *ptr++ | (0xFF << 8));
   } while (--len);
+#ifdef INTS_OFF
+  restore_interrupts(ints);
+#endif
   while (!pio_sm_is_tx_fifo_empty(FIFO_PIO, dmaReadSm)) ;
-  //sleep_ms(1);
+  while (gpio_get(nDACK) != 0) ;
   gpio_put(DRQ, 0);
-  //while (gpio_get(DIR)==1) ;
-  //while (gpio_get(DIR)==0) ;
 #else
   gpio_init(DRQ);
   gpio_put(DRQ, 1);
@@ -884,23 +889,21 @@ static inline BYTE READ_DATA()
 void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
 {
 #if 1
-  // while (!pio_sm_is_rx_fifo_empty(DMA_PIO, dmaWriteSm))
-  //   pio_sm_get(DMA_PIO, dmaWriteSm);
-
-  //pio_sm_clear_fifos(DMA_PIO, dmaWriteSm);
-  //pio_sm_restart(DMA_PIO, dmaWriteSm);
   uint mask = DRQ_MASK | DIR_MASK;
   gpio_init_mask(mask);
   gpio_put_masked(mask, mask);
   gpio_set_dir_out_masked(mask);
-  //pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true);
-  //pio_sm_get_blocking(DMA_PIO, dmaWriteSm);
+#ifdef INTS_OFF
+  uint32_t ints = save_and_disable_interrupts();
+#endif
   do
   {
     *ptr++ = pio_sm_get_blocking(DMA_PIO, dmaWriteSm) & 0xFF;
   } while (--len);
+#ifdef INTS_OFF
+  restore_interrupts(ints);
+#endif
   gpio_put(DRQ, 0);
-  //pio_sm_set_enabled(DMA_PIO, dmaWriteSm, false);
   #else
   DATA_IN();
   gpio_put(DRQ, 1);
@@ -947,7 +950,7 @@ void main_sd()
       error();
     if (fs_tmp < 7)
       error();
-    if (fs_tmp > 128)
+    if (fs_tmp > 256)
       error();
     {
       WORD rom_size = (WORD)fs_tmp;

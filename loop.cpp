@@ -1,5 +1,5 @@
 #include "hardware/pio.h"
-#include "Serial.h"
+//#include "Serial.h"
 #include "gpios.h"
 #include "fifo.pio.h"
 #include "common.h"
@@ -22,7 +22,7 @@ extern "C"
 #include "pico/multicore.h"
 #include "pico/sync.h"
 
-extern SerialUSB serial;
+//extern SerialUSB serial;
 
 const uint8_t RXEMPTY = 1; // MASK FOR RX BUFFER EMPTY
 const uint8_t TXFULL = 2;  // MASK FOR TX BUFFER FULL
@@ -286,7 +286,7 @@ void networkInit()
 
     if (retval != 1)
     {
-        printf(" SNTP failed : %d\n", retval);
+        //printf(" SNTP failed : %d\n", retval);
 
         while (1)
             ;
@@ -318,6 +318,51 @@ void networkInit()
 const uint16_t DATA_BUF_SIZE = sizeof(streamInBuf);
 bool bSockEstablished = false;
 
+class SerialUSB
+{
+    int m_char = -1;
+
+public:
+    bool available()
+    {
+        if (m_char >= 0)
+            return true;
+        m_char = stdio_getchar_timeout_us(0);
+        return m_char >= 0;
+    }
+    uint8_t read()
+    {
+        if (m_char >= 0)
+        {
+            int ret = m_char;
+            m_char = -1;
+            return ret;
+        }
+        return stdio_getchar();
+    }
+    size_t write(uint8_t c)
+    {
+        stdio_putchar(c);
+        return 1;
+    }
+    size_t write(const uint8_t *buffer, size_t size)
+    {
+        size_t n = 0;
+        while (size--)
+        {
+            if (write(*buffer++))
+                n++;
+            else
+                break;
+        }
+        return n;
+    }
+    void flush()
+    {
+        stdio_flush();
+    }
+} serial;
+
 void loop()
 {
     uint8_t retval;
@@ -326,7 +371,7 @@ void loop()
     /* Run FTP server */
     if ((retval = ftpd_run(g_ftp_buf)) < 0)
     {
-        printf(" FTP server error : %d\n", retval);
+        //printf(" FTP server error : %d\n", retval);
 
         while (1)
             ;
@@ -394,7 +439,7 @@ void loop()
         }
 
     }
-    if (!bSockEstablished && serial.available() && ((currentStatus & TXFULL) == 0) && pStreamInBufPtr == pStreamInBufEnd)
+    if (!bSockEstablished && serial.available() && ((currentStatus & TXFULL) == 0) /* && pStreamInBufPtr == pStreamInBufEnd */)
     {
         if (pStreamInBufEnd == pStreamInBufPtr)
             pStreamInBufEnd = pStreamInBufPtr = streamInBuf;
