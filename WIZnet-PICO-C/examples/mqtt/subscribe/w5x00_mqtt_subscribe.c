@@ -125,7 +125,7 @@ int main()
 
     if (retval != 1)
     {
-        printf(" Network connect failed\n");
+        //printf(" Network connect failed\n");
 
         while (1)
             ;
@@ -147,33 +147,33 @@ int main()
 
     if (retval < 0)
     {
-        printf(" MQTT connect failed : %d\n", retval);
+        //printf(" MQTT connect failed : %d\n", retval);
 
         while (1)
             ;
     }
 
-    printf(" MQTT connected\n");
+    //printf(" MQTT connected\n");
 
     /* Subscribe */
     retval = MQTTSubscribe(&g_mqtt_client, MQTT_SUBSCRIBE_TOPIC, QOS0, message_arrived);
 
     if (retval < 0)
     {
-        printf(" Subscribe failed : %d\n", retval);
+        //printf(" Subscribe failed : %d\n", retval);
 
         while (1)
             ;
     }
 
-    printf(" Subscribed\n");
+    //printf(" Subscribed\n");
 
     /* Infinite loop */
     while (1)
     {
         if ((retval = MQTTYield(&g_mqtt_client, g_mqtt_packet_connect_data.keepAliveInterval)) < 0)
         {
-            printf(" Yield error : %d\n", retval);
+            //printf(" Yield error : %d\n", retval);
 
             while (1)
                 ;
@@ -207,7 +207,7 @@ static void message_arrived(MessageData *msg_data)
 {
     MQTTMessage *message = msg_data->message;
 
-    printf("%.*s", (uint32_t)message->payloadlen, (uint8_t *)message->payload);
+    //printf("%.*s", (uint32_t)message->payloadlen, (uint8_t *)message->payload);
 }
 
 /* Timer */

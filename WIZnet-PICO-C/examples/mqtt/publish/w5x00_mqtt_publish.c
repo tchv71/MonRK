@@ -132,7 +132,7 @@ int main()
 
     if (retval != 1)
     {
-        printf(" Network connect failed\n");
+        //printf(" Network connect failed\n");
 
         while (1)
             ;
@@ -154,13 +154,13 @@ int main()
 
     if (retval < 0)
     {
-        printf(" MQTT connect failed : %d\n", retval);
+        //printf(" MQTT connect failed : %d\n", retval);
 
         while (1)
             ;
     }
 
-    printf(" MQTT connected\n");
+    //printf(" MQTT connected\n");
 
     /* Configure publish message */
     g_mqtt_message.qos = QOS0;
@@ -183,20 +183,20 @@ int main()
 
             if (retval < 0)
             {
-                printf(" Publish failed : %d\n", retval);
+                //printf(" Publish failed : %d\n", retval);
 
                 while (1)
                     ;
             }
 
-            printf(" Published\n");
+            //printf(" Published\n");
 
             start_ms = millis();
         }
 
         if ((retval = MQTTYield(&g_mqtt_client, g_mqtt_packet_connect_data.keepAliveInterval)) < 0)
         {
-            printf(" Yield error : %d\n", retval);
+            //printf(" Yield error : %d\n", retval);
 
             while (1)
                 ;

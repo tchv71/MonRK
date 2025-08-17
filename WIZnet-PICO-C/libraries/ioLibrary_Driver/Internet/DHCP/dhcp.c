@@ -598,7 +598,7 @@ int8_t parseDHCPMSG(void)
    {
    	len = recvfrom(DHCP_SOCKET, (uint8_t *)pDHCPMSG, len, svr_addr, &svr_port);
    #ifdef _DHCP_DEBUG_   
-      printf("DHCP message : %d.%d.%d.%d(%d) %d received. \r\n",svr_addr[0],svr_addr[1],svr_addr[2], svr_addr[3],svr_port, len);
+      //printf("DHCP message : %d.%d.%d.%d(%d) %d received. \r\n",svr_addr[0],svr_addr[1],svr_addr[2], svr_addr[3],svr_port, len);
    #endif   
    }
    else return 0;
@@ -609,7 +609,7 @@ int8_t parseDHCPMSG(void)
 		     (pDHCPMSG->chaddr[4] != DHCP_CHADDR[4]) || (pDHCPMSG->chaddr[5] != DHCP_CHADDR[5])   )
 		{
 #ifdef _DHCP_DEBUG_
-            printf("No My DHCP Message. This message is ignored.\r\n");
+            //printf("No My DHCP Message. This message is ignored.\r\n");
 #endif
          return 0;
 		}
@@ -619,7 +619,7 @@ int8_t parseDHCPMSG(void)
                 ((svr_addr[0]!=DHCP_REAL_SIP[0])|| (svr_addr[1]!=DHCP_REAL_SIP[1])|| (svr_addr[2]!=DHCP_REAL_SIP[2])|| (svr_addr[3]!=DHCP_REAL_SIP[3]))  )
             {
 #ifdef _DHCP_DEBUG_
-                printf("Another DHCP sever send a response message. This is ignored.\r\n");
+                //printf("Another DHCP sever send a response message. This is ignored.\r\n");
 #endif
                 return 0;
             }
@@ -806,12 +806,12 @@ uint8_t DHCP_run(void)
 					ret = DHCP_IP_CHANGED;
 					dhcp_ip_update();
                #ifdef _DHCP_DEBUG_
-                  printf(">IP changed.\r\n");
+                  //printf(">IP changed.\r\n");
                #endif
 					
 				}
          #ifdef _DHCP_DEBUG_
-            else printf(">IP is continued.\r\n");
+            else //printf(">IP is continued.\r\n");
          #endif            				
 				reset_DHCP_timeout();
 				dhcp_state = STATE_DHCP_LEASED;

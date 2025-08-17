@@ -125,13 +125,13 @@ int main()
 
     if (retval != 1)
     {
-        printf(" SNTP failed : %d\n", retval);
+        //printf(" SNTP failed : %d\n", retval);
 
         while (1)
             ;
     }
 
-    printf(" %d-%d-%d, %d:%d:%d\n", time.yy, time.mo, time.dd, time.hh, time.mm, time.ss);
+    //printf(" %d-%d-%d, %d:%d:%d\n", time.yy, time.mo, time.dd, time.hh, time.mm, time.ss);
 
     /* Infinite loop */
     while (1)

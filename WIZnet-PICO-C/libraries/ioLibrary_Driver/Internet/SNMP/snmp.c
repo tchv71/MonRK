@@ -100,7 +100,7 @@ uint32_t getSNMPTimeTick(void)
 void snmpd_init(uint8_t * managerIP, uint8_t * agentIP, uint8_t sn_agent, uint8_t sn_trap)
 {
 #ifdef _SNMP_DEBUG_
-    printf("\r\n - SNMP : Start SNMP Agent Daemon\r\n");
+    //printf("\r\n - SNMP : Start SNMP Agent Daemon\r\n");
 #endif
     SOCK_SNMP_AGENT = sn_agent;
     SOCK_SNMP_TRAP = sn_trap;

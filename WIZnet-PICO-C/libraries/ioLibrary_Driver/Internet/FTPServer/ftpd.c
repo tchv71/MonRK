@@ -193,7 +193,7 @@ FRESULT scan_files(char *path, char *buf1, int *buf_len)
     fno.lfsize = sizeof(lfn);
 #endif
 
-	printf("Open..");
+	//printf("Open..");
 	strcpy(buf, path);
 	if (strcmp(buf, "/") == 0)
 		buf[0] = 0;
@@ -202,7 +202,7 @@ FRESULT scan_files(char *path, char *buf1, int *buf_len)
 	if (res == FR_OK)
 	{
 		i = strlen(path);
-		printf("OK.");
+		//printf("OK.");
 		for (;;)
 		{
 			res = fs_readdir(); // f_readdir(&dir, &fno);
@@ -236,36 +236,36 @@ FRESULT scan_files(char *path, char *buf1, int *buf_len)
 				temp_f_time = fno.ftime;
 			}
 			// get_fileinfo(&dir, &fno);
-			printf("f_readdir ret : %d, fname %c\r\n", res, fno.fname[0]);
-			// printf("modtime = %02X%02X%02X%02X \r\n", (dir.dir + 22)[3], (dir.dir + 22)[2], (dir.dir + 22)[1],(dir.dir + 22)[0]);
-			printf("f_date:%x, f_time:%x\r\n", fno.fdate, fno.ftime);
+			//printf("f_readdir ret : %d, fname %c\r\n", res, fno.fname[0]);
+			//printf("modtime = %02X%02X%02X%02X \r\n", (dir.dir + 22)[3], (dir.dir + 22)[2], (dir.dir + 22)[1],(dir.dir + 22)[0]);
+			//printf("f_date:%x, f_time:%x\r\n", fno.fdate, fno.ftime);
 
 			if (*(FS_DIRENTRY + DIR_Attr) /*fno.fattrib*/ & AM_DIR)
 			{
 				temp_dir = 'd';
-				// printf("[D]%s\r\n",fn);
+				//printf("[D]%s\r\n",fn);
 			}
 			else
 			{
 				temp_dir = '-';
-				// printf("%s/%s : \t\t %dbyte\r\n", path, fn,fno.fsize);
+				//printf("%s/%s : \t\t %dbyte\r\n", path, fn,fno.fsize);
 			}
 			uint8_t h = fno.ftime >> 11;
 			uint8_t m = (fno.ftime >> 5) % 64;
 			len = sprintf(p_buf, "%crwxr-xr-x 1 ftp ftp %d %s %d %d %d:%.2d %s\r\n", temp_dir, fno.fsize, temp_mon[((fno.fdate >> 5) & 0x0f) - 1], (fno.fdate & 0x1f), (((fno.fdate >> 9) & 0x7f) + 1980),
 						  h, m, fn);
-			printf("mon = %d, day = %d,  year = %d \r\n", ((fno.fdate >> 5) & 0x0f) - 1, (fno.fdate & 0x1f), (((fno.fdate >> 9) & 0x7f) + 1980));
-			printf("buf[%d]:%s", len, p_buf);
+			//printf("mon = %d, day = %d,  year = %d \r\n", ((fno.fdate >> 5) & 0x0f) - 1, (fno.fdate & 0x1f), (((fno.fdate >> 9) & 0x7f) + 1980));
+			//printf("buf[%d]:%s", len, p_buf);
 			p_buf += len;
 		}
 	}
 	else
 	{
-		printf("path(%s) not found:Error(%d)\r\n", path, res);
+		//printf("path(%s) not found:Error(%d)\r\n", path, res);
 	}
 	*p_buf = 0;
 	*buf_len = strlen(buf1);
-	printf("last[%d]=%s[end]\r\n", *buf_len, buf1);
+	//printf("last[%d]=%s[end]\r\n", *buf_len, buf1);
 	return file_cnt;
 }
 
@@ -382,7 +382,7 @@ uint8_t ftpd_run(uint8_t *dbuf)
 		}
 
 #if defined(_FTP_DEBUG_)
-		// printf("ftp socket %d\r\n", CTRL_SOCK);
+		//printf("ftp socket %d\r\n", CTRL_SOCK);
 #endif
 
 		if ((size = getSn_RX_RSR(CTRL_SOCK)) > 0) // Don't need to check SOCKERR_BUSY because it doesn't not occur.
@@ -528,7 +528,7 @@ uint8_t ftpd_run(uint8_t *dbuf)
 				do
 				{
 #if defined(_FTP_DEBUG_)
-					// printf("remained file size: %d\r\n", ftp.fil.fsize);
+					//printf("remained file size: %d\r\n", ftp.fil.fsize);
 #endif
 					memset(dbuf, 0, _MAX_SS);
 
@@ -543,8 +543,8 @@ uint8_t ftpd_run(uint8_t *dbuf)
 						break;
 #if defined(_FTP_DEBUG_)
 					printf("#");
-					// printf("----->fsize:%d recv:%d len:%d \r\n", remain_filesize, send_byte, blocklen);
-					// printf("----->fn:%s data:%s \r\n", ftp.filename, dbuf);
+					//printf("----->fsize:%d recv:%d len:%d \r\n", remain_filesize, send_byte, blocklen);
+					//printf("----->fn:%s data:%s \r\n", ftp.filename, dbuf);
 #endif
 					send(DATA_SOCK, dbuf, blocklen);
 					remain_filesize -= blocklen;
@@ -615,11 +615,11 @@ uint8_t ftpd_run(uint8_t *dbuf)
 							fs_file_wlen = ret;
 							fs_wtotal = fs_file_wlen;
 #if defined(_FTP_DEBUG_)
-							// printf("----->fn:%s data:%s \r\n", ftp.filename, dbuf);
+							//printf("----->fn:%s data:%s \r\n", ftp.filename, dbuf);
 #endif
 
 #if defined(_FTP_DEBUG_)
-							// printf("----->dsize:%d recv:%d len:%d \r\n", remain_datasize, ret, blocklen);
+							//printf("----->dsize:%d recv:%d len:%d \r\n", remain_datasize, ret, blocklen);
 #endif
 							remain_datasize -= fs_wtotal;
 

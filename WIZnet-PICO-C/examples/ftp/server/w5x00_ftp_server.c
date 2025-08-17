@@ -92,7 +92,7 @@ int main()
         /* Run FTP server */
         if ((retval = ftpd_run(g_ftp_buf)) < 0)
         {
-            printf(" FTP server error : %d\n", retval);
+            //printf(" FTP server error : %d\n", retval);
 
             while (1)
                 ;

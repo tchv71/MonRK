@@ -125,20 +125,20 @@ int main()
 
     if (retval < 0)
     {
-        printf(" SSL initialize failed %d\n", retval);
+        //printf(" SSL initialize failed %d\n", retval);
 
         while (1)
             ;
     }
 
     /* Get ciphersuite information */
-    printf(" Supported ciphersuite lists\n");
+    //printf(" Supported ciphersuite lists\n");
 
     list = mbedtls_ssl_list_ciphersuites();
 
     while (*list)
     {
-        printf(" %-42s\n", mbedtls_ssl_get_ciphersuite_name(*list));
+        //printf(" %-42s\n", mbedtls_ssl_get_ciphersuite_name(*list));
 
         list++;
 
@@ -147,7 +147,7 @@ int main()
             break;
         }
 
-        printf(" %s\n", mbedtls_ssl_get_ciphersuite_name(*list));
+        //printf(" %s\n", mbedtls_ssl_get_ciphersuite_name(*list));
 
         list++;
     }
@@ -156,7 +156,7 @@ int main()
 
     if (retval != SOCKET_SSL)
     {
-        printf(" Socket failed %d\n", retval);
+        //printf(" Socket failed %d\n", retval);
 
         while (1)
             ;
@@ -176,26 +176,26 @@ int main()
 
     if ((retval != SOCK_OK) || (retval == SOCK_BUSY))
     {
-        printf(" Connect failed %d\n", retval);
+        //printf(" Connect failed %d\n", retval);
 
         while (1)
             ;
     }
 
-    printf(" Connected %d\n", retval);
+    //printf(" Connected %d\n", retval);
 
     while ((retval = mbedtls_ssl_handshake(&g_ssl)) != 0)
     {
         if ((retval != MBEDTLS_ERR_SSL_WANT_READ) && (retval != MBEDTLS_ERR_SSL_WANT_WRITE))
         {
-            printf(" failed\n  ! mbedtls_ssl_handshake returned -0x%x\n", -retval);
+            //printf(" failed\n  ! mbedtls_ssl_handshake returned -0x%x\n", -retval);
 
             while (1)
                 ;
         }
     }
 
-    printf(" ok\n    [ Ciphersuite is %s ]\n", mbedtls_ssl_get_ciphersuite(&g_ssl));
+    //printf(" ok\n    [ Ciphersuite is %s ]\n", mbedtls_ssl_get_ciphersuite(&g_ssl));
 
     memset(g_ssl_buf, 0x00, ETHERNET_BUF_MAX_SIZE);
     strcpy(g_ssl_buf, " W5x00 TCP over SSL test\n");
@@ -218,7 +218,7 @@ int main()
 
             mbedtls_ssl_read(&g_ssl, g_ssl_buf, len);
 
-            printf("%s", g_ssl_buf);
+            //printf("%s", g_ssl_buf);
         }
     }
 }
@@ -258,12 +258,12 @@ static int wizchip_ssl_init(uint8_t *socket_fd)
                                               MBEDTLS_SSL_TRANSPORT_STREAM,
                                               MBEDTLS_SSL_PRESET_DEFAULT)) != 0)
     {
-        printf(" failed\n  ! mbedtls_ssl_config_defaults returned %d\n", retval);
+        //printf(" failed\n  ! mbedtls_ssl_config_defaults returned %d\n", retval);
 
         return -1;
     }
 
-    printf(" Socket descriptor %d\n", socket_fd);
+    //printf(" Socket descriptor %d\n", socket_fd);
 
     mbedtls_ssl_conf_authmode(&g_conf, MBEDTLS_SSL_VERIFY_NONE);
     mbedtls_ssl_conf_rng(&g_conf, ssl_random_callback, &g_ctr_drbg);
@@ -272,7 +272,7 @@ static int wizchip_ssl_init(uint8_t *socket_fd)
 
     if ((retval = mbedtls_ssl_setup(&g_ssl, &g_conf)) != 0)
     {
-        printf(" failed\n  ! mbedtls_ssl_setup returned %d\n", retval);
+        //printf(" failed\n  ! mbedtls_ssl_setup returned %d\n", retval);
 
         return -1;
     }

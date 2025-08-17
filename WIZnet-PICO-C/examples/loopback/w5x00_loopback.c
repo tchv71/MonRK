@@ -96,7 +96,7 @@ int main()
         /* TCP server loopback test */
         if ((retval = loopback_tcps(SOCKET_LOOPBACK, g_loopback_buf, PORT_LOOPBACK)) < 0)
         {
-            printf(" Loopback error : %d\n", retval);
+            //printf(" Loopback error : %d\n", retval);
 
             while (1)
                 ;

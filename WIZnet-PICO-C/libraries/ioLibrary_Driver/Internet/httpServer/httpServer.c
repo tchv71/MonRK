@@ -698,14 +698,14 @@ uint8_t display_reg_webContent_list(void)
 		printf("\r\n=== List of Web content in code flash ===\r\n");
 		for(i = 0; i < total_content_cnt; i++)
 		{
-			printf(" [%d] ", i+1);
-			printf("%s, ", web_content[i].content_name);
-			printf("%ld byte, ", web_content[i].content_len);
+			//printf(" [%d] ", i+1);
+			//printf("%s, ", web_content[i].content_name);
+			//printf("%ld byte, ", web_content[i].content_len);
 
-			if(web_content[i].content_len < 30) printf("[%s]\r\n", web_content[i].content);
-			else printf("[ ... ]\r\n");
+			//if(web_content[i].content_len < 30) //printf("[%s]\r\n", web_content[i].content);
+			//else //printf("[ ... ]\r\n");
 		}
-		printf("=========================================\r\n\r\n");
+		//printf("=========================================\r\n\r\n");
 		ret = 1;
 	}
 

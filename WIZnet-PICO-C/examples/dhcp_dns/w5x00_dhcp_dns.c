@@ -139,7 +139,7 @@ int main()
             {
                 if (g_dhcp_get_ip_flag == 0)
                 {
-                    printf(" DHCP success\n");
+                    //printf(" DHCP success\n");
 
                     g_dhcp_get_ip_flag = 1;
                 }
@@ -151,13 +151,13 @@ int main()
 
                 if (dhcp_retry <= DHCP_RETRY_COUNT)
                 {
-                    printf(" DHCP timeout occurred and retry %d\n", dhcp_retry);
+                    //printf(" DHCP timeout occurred and retry %d\n", dhcp_retry);
                 }
             }
 
             if (dhcp_retry > DHCP_RETRY_COUNT)
             {
-                printf(" DHCP failed\n");
+                //printf(" DHCP failed\n");
 
                 DHCP_stop();
 
@@ -175,10 +175,10 @@ int main()
             {
                 if (DNS_run(g_net_info.dns, g_dns_target_domain, g_dns_target_ip) > 0)
                 {
-                    printf(" DNS success\n");
-                    printf(" Target domain : %s\n", g_dns_target_domain);
-                    printf(" IP of target domain : %d.%d.%d.%d\n", g_dns_target_ip[0], g_dns_target_ip[1], g_dns_target_ip[2], g_dns_target_ip[3]);
-
+                    //printf(" DNS success\n");
+                    //printf(" Target domain : %s\n", g_dns_target_domain);
+                    //printf(" IP of target domain : %d.%d.%d.%d\n", g_dns_target_ip[0], g_dns_target_ip[1], g_dns_target_ip[2], g_dns_target_ip[3]);
+//
                     g_dns_get_ip_flag = 1;
 
                     break;
@@ -189,13 +189,13 @@ int main()
 
                     if (dns_retry <= DNS_RETRY_COUNT)
                     {
-                        printf(" DNS timeout occurred and retry %d\n", dns_retry);
+                        //printf(" DNS timeout occurred and retry %d\n", dns_retry);
                     }
                 }
 
                 if (dns_retry > DNS_RETRY_COUNT)
                 {
-                    printf(" DNS failed\n");
+                    //printf(" DNS failed\n");
 
                     while (1)
                         ;
@@ -231,7 +231,7 @@ static void set_clock_khz(void)
 /* DHCP */
 static void wizchip_dhcp_init(void)
 {
-    printf(" DHCP client running\n");
+    //printf(" DHCP client running\n");
 
     DHCP_init(SOCKET_DHCP, g_ethernet_buf);
 
@@ -251,12 +251,12 @@ static void wizchip_dhcp_assign(void)
     network_initialize(g_net_info); // apply from DHCP
 
     print_network_information(g_net_info);
-    printf(" DHCP leased time : %ld seconds\n", getDHCPLeasetime());
+    //printf(" DHCP leased time : %ld seconds\n", getDHCPLeasetime());
 }
 
 static void wizchip_dhcp_conflict(void)
 {
-    printf(" Conflict IP from DHCP\n");
+    ////printf(" Conflict IP from DHCP\n");
 
     // halt or reset or any...
     while (1)
