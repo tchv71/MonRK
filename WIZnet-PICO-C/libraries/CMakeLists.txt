@@ -111,6 +111,7 @@ add_library(FTPSERVER_FILES STATIC)
 
 target_sources(FTPSERVER_FILES PUBLIC
         ${WIZNET_DIR}/Internet/FTPServer/ftpd.c
+        ${WIZNET_DIR}/Internet/FTPServer/ftpd_cpm.c
         )
 
 target_include_directories(FTPSERVER_FILES PUBLIC

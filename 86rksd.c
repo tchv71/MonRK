@@ -38,7 +38,7 @@
 #define ERR_DATETIME 0x50
 #define STA_OK_BLOCK 0x4F
 
-BYTE buf[512];
+BYTE buf[1024+16];
 BYTE rom[128];
 #define flash
 
@@ -839,23 +839,35 @@ const uint fifoWrite2Sm = 1;
 extern int res;
 //extern const uint fifoWriteSm;
 extern const uint fifoReadSm;
-//#define INTS_OFF 1
+#define INTS_OFF 0
+
+void __not_in_flash_func(dma_send64)(BYTE *ptr, WORD* pLen);
 
 void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
+{
+  do
+  {
+    dma_send64(ptr, &len);
+    ptr += 32;
+  } while (len);
+}
+
+void __not_in_flash_func(dma_send64)(BYTE *ptr, WORD* pLen)
 {
 #if 1
   gpio_init(DRQ);
   gpio_put(DRQ, 1);
   gpio_set_dir(DRQ, GPIO_OUT);
   pio_gpio_init(FIFO_PIO, DIR);
-#ifdef INTS_OFF
+#if INTS_OFF
   uint32_t ints = save_and_disable_interrupts();
 #endif
+  uint32_t loopCnt = 32;
   do
   {
-    pio_sm_put_blocking(FIFO_PIO, dmaReadSm, *ptr++ | (0xFF << 8));
-  } while (--len);
-#ifdef INTS_OFF
+    pio_sm_put_blocking(FIFO_PIO, dmaReadSm, (*ptr++) | (0xFF << 8));
+  } while (--(*pLen) && --loopCnt);
+#if INTS_OFF
   restore_interrupts(ints);
 #endif
   while (!pio_sm_is_tx_fifo_empty(FIFO_PIO, dmaReadSm)) ;
@@ -893,14 +905,14 @@ void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
   gpio_init_mask(mask);
   gpio_put_masked(mask, mask);
   gpio_set_dir_out_masked(mask);
-#ifdef INTS_OFF
+#if INTS_OFF
   uint32_t ints = save_and_disable_interrupts();
 #endif
   do
   {
     *ptr++ = pio_sm_get_blocking(DMA_PIO, dmaWriteSm) & 0xFF;
   } while (--len);
-#ifdef INTS_OFF
+#if INTS_OFF
   restore_interrupts(ints);
 #endif
   gpio_put(DRQ, 0);
@@ -961,15 +973,21 @@ void main_sd()
 
       // Гасим светодиод
       LedOff();
-#if 0
+#if 1
     //sendStart(0x45);
     //sendFlush();
-    dma_send(rom, rom_size);
-    dma_receive(buf, rom_size);
-    dma_send(buf, rom_size);
-    //static int n = 0;
-    //n = memcmp(buf, rom, rom_size);
-    while (1) ;
+#if 0
+    for (int i=0; i<rom_size; ++i)
+      rom[i] = (i%2 == 0) ? 0 : 0xFE;
+#endif
+    while (1)
+    {
+      dma_send(rom, rom_size);
+      dma_receive(buf, rom_size);
+      dma_send(buf, rom_size);
+      //static int n = 0;
+      //n = memcmp(buf, rom, rom_size);
+    }
 #endif
     }
     mutex_exit(&sd_mutex);

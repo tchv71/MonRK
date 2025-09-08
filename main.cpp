@@ -88,6 +88,8 @@ extern void __not_in_flash_func(pio_irq_handler_write)();
  */
 void dmaPioInit()
 {
+    // DMA Read  = SD  -> Mem
+    // DMA Write = Mem -> SD
     uint dmaWriteProgram = pio_add_program(DMA_PIO, &dmaWrite_program);
 
     pio_sm_config writeConfig = dmaWrite_program_get_default_config(dmaWriteProgram);
@@ -190,21 +192,21 @@ void setup()
 
 int main()
 {
-    vreg_set_voltage(VREG_VOLTAGE_1_25);
+    vreg_set_voltage(VREG_VOLTAGE_1_30);
     set_sys_clock_pll(PICO_CLOCK_PLL, PICO_CLOCK_PLL_DIV1, PICO_CLOCK_PLL_DIV2); // 252000
-
+    //set_sys_clock_khz(290000, false);
     stdio_init_all();
     //stdio_set_translate_crlf(&stdio_usb, false);
 
-    setup();
-    multicore_launch_core1(main1);
+   multicore_launch_core1(main1);
+   setup();
     //__USBStart();
 
     //while (true) ;
     //setup();
     while (true)
     {
-        //tight_loop_contents();
+        tight_loop_contents();
         loop();
         //_loop();
     }

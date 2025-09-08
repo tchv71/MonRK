@@ -19,6 +19,7 @@ extern "C"
 #include "hardware/rtc.h"
 
 #include "ftpd.h"
+#include "ftpd_cpm.h"
 #include "pico/multicore.h"
 #include "pico/sync.h"
 
@@ -126,7 +127,7 @@ void fifoPioInit()
     pStreamInBufPtr = pStreamInBufEnd = streamInBuf;
     pStreamOutBufPtr = streamOutBuf;
 
-
+#if USE_SERIAL_DEBUG
     int fifoReadProgOffset = pio_add_program(FIFO_PIO, &fifoRead_program);
     if (fifoReadProgOffset<0)
         panic("Failed add fifoReadProgram");
@@ -171,6 +172,7 @@ void fifoPioInit()
     pio_set_irq1_source_enabled(DMA_PIO, pis_sm1_rx_fifo_not_empty, true);
 
     updateFifoReadAhead();
+#endif
 }
 
 /* Clock */
@@ -241,6 +243,9 @@ static time_t millis(void)
 static uint8_t g_ftp_buf[ETHERNET_BUF_MAX_SIZE] = {
     0,
 };
+static uint8_t g_ftp_buf_cpm[ETHERNET_BUF_MAX_SIZE] = {
+    0,
+};
 
 extern "C"
 {
@@ -309,9 +314,11 @@ void networkInit()
     rtc_set_datetime(&t);
 
     ftpd_init(g_net_info.ip);
+    ftpd_cpm_init(g_net_info.ip);
+    
 
     /* Get network information */
-    print_network_information(g_net_info);
+    //print_network_information(g_net_info);
     multicore_fifo_pop_blocking();
 }
 
@@ -377,6 +384,13 @@ void loop()
             ;
     }
     //mutex_exit(get_sd_mutex());
+    if ((retval = ftpd_cpm_run(g_ftp_buf_cpm)) < 0)
+    {
+        //printf(" FTP server error : %d\n", retval);
+
+        while (1)
+            ;
+    }
 #endif
     static uint8_t res;
     static uint16_t len;
@@ -440,6 +454,7 @@ void loop()
 
     }
 #endif
+#if USE_SERIAL_DEBUG
     if (!bSockEstablished && serial.available() && ((currentStatus & TXFULL) == 0) /* && pStreamInBufPtr == pStreamInBufEnd */)
     {
         if (pStreamInBufEnd == pStreamInBufPtr)
@@ -475,11 +490,12 @@ void loop()
               len = size;
             send(s, streamOutBuf, len);
         }
-#endif
         else return;
+#endif
         pStreamOutBufPtr = streamOutBuf;
         currentStatus &= ~TXFULL;
         bFlushOutBuffer = false;
         updateFifoReadAhead();
     }
+#endif
 }

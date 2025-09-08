@@ -22,7 +22,7 @@
 // #include "stdio_private.h"
 
 /* Command table */
-static char *commands[] = {
+char *commands[] = {
 	"user",
 	"acct",
 	"pass",
@@ -108,26 +108,6 @@ int current_hour = 10;
 int current_min = 10;
 int current_sec = 30;
 
-int fsprintf(uint8_t s, const char *format, ...)
-{
-	int i;
-	/*
-		char buf[LINELEN];
-		FILE f;
-		va_list ap;
-
-		f.flags = __SWR | __SSTR;
-		f.buf = buf;
-		f.size = INT_MAX;
-		va_start(ap, format);
-		i = vfprintf(&f, format, ap);
-		va_end(ap);
-		buf[f.len] = 0;
-
-		send(s, (uint8_t *)buf, strlen(buf));
-	*/
-	return i;
-}
 
 void ftpd_init(uint8_t *src_ip)
 {
@@ -186,8 +166,7 @@ FRESULT scan_files(char *path, char *buf1, int *buf_len)
 	WORD temp_f_date = 0;
 	WORD temp_f_time = 0;
 
-// #if _USE_LFN
-#if 0
+#if _USE_LFN
     static char lfn[_MAX_LFN * (_DF1S ? 2 : 1) + 1];
     fno.altname = lfn;
     fno.lfsize = sizeof(lfn);
@@ -206,9 +185,9 @@ FRESULT scan_files(char *path, char *buf1, int *buf_len)
 		for (;;)
 		{
 			res = fs_readdir(); // f_readdir(&dir, &fno);
-			if (res != FR_OK || FS_DIRENTRY[0] == 0 /* fno.fname[0] */)
+			if (res != FR_OK || FS_DIRENTRY[0] == 0)
 				break;
-			if (FS_DIRENTRY[0] /* fno.fname[0]  */ == '.')
+			if (FS_DIRENTRY[0] == '.')
 				continue;
 			get_file_name(fno.fname);
 			// memcpy(fno.fname, FS_DIRENTRY + DIR_Name, 8);
@@ -219,8 +198,7 @@ FRESULT scan_files(char *path, char *buf1, int *buf_len)
 			memcpy(&fno.ftime, FS_DIRENTRY + DIR_WrtTime, 2);
 			memcpy(&fno.fdate, FS_DIRENTRY + DIR_WrtTime + 2, 2);
 
-// #if _USE_LFN
-#if 0
+#if _USE_LFN
             fn = *fno.altname ? fno.altname : fno.fname;
 #else
 			fn = fno.fname;
@@ -240,7 +218,7 @@ FRESULT scan_files(char *path, char *buf1, int *buf_len)
 			//printf("modtime = %02X%02X%02X%02X \r\n", (dir.dir + 22)[3], (dir.dir + 22)[2], (dir.dir + 22)[1],(dir.dir + 22)[0]);
 			//printf("f_date:%x, f_time:%x\r\n", fno.fdate, fno.ftime);
 
-			if (*(FS_DIRENTRY + DIR_Attr) /*fno.fattrib*/ & AM_DIR)
+			if (FS_DIRENTRY[DIR_Attr] & AM_DIR)
 			{
 				temp_dir = 'd';
 				//printf("[D]%s\r\n",fn);
@@ -293,9 +271,9 @@ int get_filesize(char *path, char *filename)
 		for (;;)
 		{
 			res = fs_readdir(); // f_readdir(&dir, &fno);
-			if (res != FR_OK || /*fno.fname*/ (FS_DIRENTRY + DIR_Name)[0] == 0)
+			if (res != FR_OK || FS_DIRENTRY[DIR_Name] == 0)
 				break;
-			if (/*fno.fname*/ (FS_DIRENTRY + DIR_Name)[0] == '.')
+			if (FS_DIRENTRY[DIR_Name] == '.')
 				continue;
 #if 0
 #ifdef _USE_LFN
@@ -352,9 +330,6 @@ uint8_t ftpd_run(uint8_t *dbuf)
 	uint32_t blocklen, send_byte, recv_byte;
 	uint32_t remain_filesize;
 	uint32_t remain_datasize;
-#if defined(F_FILESYSTEM)
-	// FILINFO fno;
-#endif
 
 	// memset(dbuf, 0, sizeof(_MAX_SS));
 
@@ -382,7 +357,7 @@ uint8_t ftpd_run(uint8_t *dbuf)
 		}
 
 #if defined(_FTP_DEBUG_)
-		//printf("ftp socket %d\r\n", CTRL_SOCK);
+		printf("ftp socket %d\r\n", CTRL_SOCK);
 #endif
 
 		if ((size = getSn_RX_RSR(CTRL_SOCK)) > 0) // Don't need to check SOCKERR_BUSY because it doesn't not occur.
@@ -485,16 +460,10 @@ uint8_t ftpd_run(uint8_t *dbuf)
 #if defined(_FTP_DEBUG_)
 			printf("previous size: %d\r\n", size);
 #endif
-#if defined(F_FILESYSTEM)
 			scan_files(ftp.workingdir, dbuf, (int *)&size);
-#endif
 #if defined(_FTP_DEBUG_)
 			printf("returned size: %d\r\n", size);
 			printf("%s\r\n", dbuf);
-#endif
-#if !defined(F_FILESYSTEM)
-			if (strncmp(ftp.workingdir, "/$Recycle.Bin", sizeof("/$Recycle.Bin")) != 0)
-				size = sprintf(dbuf, "drwxr-xr-x 1 ftp ftp 0 Dec 31 2014 $Recycle.Bin\r\n-rwxr-xr-x 1 ftp ftp 512 Dec 31 2014 test.txt\r\n");
 #endif
 			size = strlen(dbuf);
 			char *pData = dbuf;
@@ -514,9 +483,9 @@ uint8_t ftpd_run(uint8_t *dbuf)
 #if defined(_FTP_DEBUG_)
 			printf("filename to retrieve : %s %d\r\n", ftp.filename, strlen(ftp.filename));
 #endif
-#if defined(F_FILESYSTEM)
 			strcpy(buf, ftp.filename[0] == '/' ? ftp.filename + 1 : ftp.filename);
-			ftp.fr = fs_open(); // f_open(&(ftp.fil), (const char *)ftp.filename, FA_READ);
+			ftp.fr = fs_open();
+			// f_open(&(ftp.fil), (const char *)ftp.filename, FA_READ);
 			// print_filedsc(&(ftp.fil));
 			if (ftp.fr == FR_OK)
 			{
@@ -560,22 +529,6 @@ uint8_t ftpd_run(uint8_t *dbuf)
 				printf("File Open Error: %d\r\n", ftp.fr);
 #endif
 			}
-#else
-			remain_filesize = strlen(ftp.filename);
-
-			do
-			{
-				memset(dbuf, 0, _MAX_SS);
-
-				blocklen = sprintf(dbuf, "%s", ftp.filename);
-
-				printf("########## dbuf:%s\r\n", dbuf);
-
-				send(DATA_SOCK, dbuf, blocklen);
-				remain_filesize -= blocklen;
-			} while (remain_filesize != 0);
-
-#endif
 			ftp.current_cmd = NO_CMD;
 			disconnect(DATA_SOCK);
 			size = sprintf(dbuf, "226 Successfully transferred \"%s\"\r\n", ftp.filename);
@@ -586,13 +539,12 @@ uint8_t ftpd_run(uint8_t *dbuf)
 #if defined(_FTP_DEBUG_)
 			printf("filename to store : %s %d\r\n", ftp.filename, strlen(ftp.filename));
 #endif
-#if defined(F_FILESYSTEM)
 			strcpy(buf, ftp.filename);
 			fs_delete();
 			strcpy(buf, ftp.filename);
 			ftp.fr = fs_create(); // f_open(&(ftp.fil), (const char *)ftp.filename, FA_CREATE_ALWAYS | FA_WRITE);
 			// print_filedsc(&(ftp.fil));
-						if (ftp.fr == FR_OK)
+			if (ftp.fr == FR_OK)
 			{
 #if defined(_FTP_DEBUG_)
 				printf("f_open return FR_OK\r\n");
@@ -680,37 +632,6 @@ uint8_t ftpd_run(uint8_t *dbuf)
 			// fno.fdate = (WORD)(((current_year - 1980) << 9) | (current_month << 5) | current_day);
 			// fno.ftime = (WORD)((current_hour << 11) | (current_min << 5) | (current_sec >> 1));
 			// f_utime((const char *)ftp.filename, &fno);
-#else
-			while (1)
-			{
-				if ((remain_datasize = getSn_RX_RSR(DATA_SOCK)) > 0)
-				{
-					while (1)
-					{
-						memset(dbuf, 0, _MAX_SS);
-
-						if (remain_datasize > _MAX_SS)
-							recv_byte = _MAX_SS;
-						else
-							recv_byte = remain_datasize;
-
-						ret = recv(DATA_SOCK, dbuf, recv_byte);
-
-						printf("########## dbuf:%s\r\n", dbuf);
-
-						remain_datasize -= ret;
-
-						if (remain_datasize <= 0)
-							break;
-					}
-				}
-				else
-				{
-					if (getSn_SR(DATA_SOCK) != SOCK_ESTABLISHED)
-						break;
-				}
-			}
-#endif
 			ftp.current_cmd = NO_CMD;
 			disconnect(DATA_SOCK);
 			size = sprintf(dbuf, "226 Successfully transferred \"%s\"\r\n", ftp.filename);
@@ -858,7 +779,8 @@ char proc_ftpd(char *ftp_buf)
 		arg++;
 
 	/* Execute specific command */
-	switch (cmdp - commands)
+	enum ftp_cmd cmd = (enum ftp_cmd)(cmdp - commands);
+	switch (cmd)
 	{
 	case USER_CMD:
 #if defined(_FTP_DEBUG_)
@@ -1089,7 +1011,7 @@ char proc_ftpd(char *ftp_buf)
 		{
 			tmpstr = strrchr(arg, '/');
 			*tmpstr = 0;
-#if defined(F_FILESYSTEM)
+
 			if (strlen(ftp.workingdir) == 1)
 				sprintf(ftp.filename, "/%s", arg);
 			else
@@ -1099,9 +1021,6 @@ char proc_ftpd(char *ftp_buf)
 			fs_getfilesize(); // get_filesize(arg, tmpstr + 1);
 			slen = fs_tmp;
 			fs_close();
-#else
-			slen = _MAX_SS;
-#endif
 			if (slen > 0)
 				slen = sprintf(sendbuf, "213 %d\r\n", slen);
 			else
@@ -1122,7 +1041,7 @@ char proc_ftpd(char *ftp_buf)
 		{
 			// arg[slen - 3] = 0x00;
 			tmpstr = strrchr(arg, '/');
-			if (!strcmp(arg, ".."))
+			if (strcmp(arg, "..") == 0)
 			{
 				*arg = 0;
 				tmpstr = strrchr(ftp.workingdir, '/');
@@ -1138,14 +1057,10 @@ char proc_ftpd(char *ftp_buf)
 					slen = get_filesize(ftp.workingdir, arg);
 				else
 					*tmpstr = 0;
-#if defined(F_FILESYSTEM)
 				if (tmpstr != NULL)
 					slen = get_filesize(arg, tmpstr + 1);
 				if (slen == -1)
 					slen = 0;
-#else
-				slen = 0;
-#endif
 				if (tmpstr)
 					*tmpstr = '/';
 			}
@@ -1181,7 +1096,6 @@ char proc_ftpd(char *ftp_buf)
 		slen = strlen(arg);
 		arg[slen - 1] = 0x00;
 		arg[slen - 2] = 0x00;
-#if defined(F_FILESYSTEM)
 		// strcpy(buf, arg);
 		set_fullpath(arg);
 		if (fs_createdir() != 0) // f_mkdir(arg) != 0)
@@ -1193,9 +1107,6 @@ char proc_ftpd(char *ftp_buf)
 			slen = sprintf(sendbuf, "257 MKD command successful. \"%s\"\r\n", arg);
 			// strcpy(ftp.workingdir, arg);
 		}
-#else
-		slen = sprintf(sendbuf, "550 Can't create directory. Permission denied\r\n");
-#endif
 		send(CTRL_SOCK, (uint8_t *)sendbuf, slen);
 		break;
 
@@ -1203,7 +1114,6 @@ char proc_ftpd(char *ftp_buf)
 		slen = strlen(arg);
 		arg[slen - 1] = 0x00;
 		arg[slen - 2] = 0x00;
-#if defined(F_FILESYSTEM)
 		set_fullpath(arg);
 		if (fs_delete() != 0) // f_unlink(arg) != 0)
 		{
@@ -1213,9 +1123,6 @@ char proc_ftpd(char *ftp_buf)
 		{
 			slen = sprintf(sendbuf, "250 Deleted. \"%s\"\r\n", arg);
 		}
-#else
-		slen = sprintf(sendbuf, "550 Could not delete. Permission denied\r\n");
-#endif
 		send(CTRL_SOCK, (uint8_t *)sendbuf, slen);
 		break;
 
@@ -1300,7 +1207,6 @@ int pport(char *arg)
 	return 0;
 }
 
-#if defined(F_FILESYSTEM)
 void print_filedsc(FIL *fil)
 {
 #if defined(_FTP_DEBUG_)
@@ -1317,4 +1223,3 @@ void print_filedsc(FIL *fil)
 	printf("dir entry pointer : %08X\r\n", fil->dir_ptr);
 #endif
 }
-#endif

@@ -73,9 +73,9 @@ endPart:
   out pindirs, 8 side 1
   pull block
 pullLoop2:
-  wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
+  jmp pin, pullLoop2 ; nDACK_PIN
+  ;wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
   wait 0 gpio nIOR_PIN  ; wait for nIOR to go active (low)
-  jmp pin, pullLoop2
   out pins, 8           ; send the data byte
   out pindirs, 8 side 0 ; set up CD0-7 as outputs
   wait 1 gpio nIOR_PIN  ; wait for nIOR to go inactive (high)

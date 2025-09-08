@@ -13,6 +13,7 @@
 #define CONST
 #define USE_DMA 1
 #define USE_ETHERNET 1
+#define USE_SERIAL_DEBUG 1
 
 enum
 {
