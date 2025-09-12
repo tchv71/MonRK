@@ -138,9 +138,18 @@ void setup1()
     gpio_put (DRQ, 0);
     gpio_set_dir (DRQ, GPIO_OUT);
 
-    gpio_init(25);
-    gpio_set_dir(25, GPIO_OUT);
-    gpio_put(25, 0);
+    gpio_init(nDACK);
+    gpio_set_dir(nDACK, GPIO_IN);
+
+    gpio_init(nIOR);
+    gpio_set_dir(nIOR, GPIO_IN);
+
+    gpio_init(nIOW);
+    gpio_set_dir(nIOW, GPIO_IN);
+
+    // gpio_init(25);
+    // gpio_set_dir(25, GPIO_OUT);
+    // gpio_put(25, 1);
 
     // SD cards' DO MUST be pulled up.
     gpio_pull_up(SPI_RX);
@@ -178,7 +187,8 @@ extern void networkInit();
 
 void setup()
 {
-    gpio_init_mask(/* GPIO_CD_MASK | */ GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
+    gpio_init_mask(GPIO_CD_MASK | GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
+    gpio_set_dir_in_masked(GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
     fifoPioInit();
     //serial.ignoreFlowControl();
 #if USE_ETHERNET
@@ -189,6 +199,7 @@ void setup()
 #define PICO_CLOCK_PLL 1260000000
 #define PICO_CLOCK_PLL_DIV1 5
 #define PICO_CLOCK_PLL_DIV2 1
+extern TCP_SERVER_T* state;
 
 int main()
 {

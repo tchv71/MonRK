@@ -30,7 +30,8 @@ CON,PRN,AUX,CLOCK$,NUL,COM1,COM2,COM3,COM4,LPT1,LPT2,LPT3
 #include "sd.h"
 #include <string.h>
 #include "pico/time.h"
-#include "hardware/rtc.h"
+#include "pico/aon_timer.h"
+//#include "hardware/rtc.h"
 
 /* Для наглядности */
 
@@ -1120,16 +1121,16 @@ abort:
 
 static void fs_set_entry_timestamp(BYTE *entry, BYTE whichTs)
 {
-  datetime_t t;
-  if (rtc_get_datetime(&t))
+  struct tm t;
+  if (aon_timer_get_time_calendar(&t))
   {
-    if (t.year<2000)
-      t.year -= 1900;
+    if (t.tm_year<2000)
+      t.tm_year -= 1900;
     else
-      t.year -= 2000;
-    WORD time = t.sec / 2 | (t.min << 5) | (t.hour << 11);
-    WORD date = t.day | (t.month << 5)
-	| ((t.year >= 80 ? t.year - 80 : t.year + 20) << 9);
+      t.tm_year -= 2000;
+    WORD time = t.tm_sec / 2 | (t.tm_min << 5) | (t.tm_hour << 11);
+    WORD date = t.tm_mday | (t.tm_mon << 5)
+	| ((t.tm_year >= 80 ? t.tm_year - 80 : t.tm_year + 20) << 9);
     if (whichTs & TS_WRT)
     {
       LD_WORD(entry + DIR_WrtTime) = time;

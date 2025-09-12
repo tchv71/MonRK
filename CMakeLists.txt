@@ -29,7 +29,7 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
-set(PICO_BOARD waveshare_rp2040_zero CACHE STRING "Board type")
+set(PICO_BOARD pico2_w CACHE STRING "Board type")
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
@@ -41,15 +41,15 @@ project(MonRk C CXX ASM)
 pico_sdk_init()
 
 
-add_subdirectory(WIZnet-PICO-C)
+#add_subdirectory(WIZnet-PICO-C)
 
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(MonRk )
 target_sources(MonRk PRIVATE main.cpp
 # Serial.cpp RP2040USB.cpp
- loop.cpp sd.c 86rksd.c fs.c proto.c WIZnet-PICO-C/port/ioLibrary_Driver/src/w5x00_spi.c usb_msc_driver.c
- cpmfs.c device.c
+ loop.cpp sd.c 86rksd.c fs.c proto.c usb_msc_driver.c
+ cpmfs.c device.c #ftpd.c
 )
 
 pico_set_program_name(MonRk "MonRK")
@@ -68,15 +68,14 @@ target_link_libraries(MonRk PRIVATE
         hardware_pio
         hardware_spi
         hardware_dma
-        hardware_rtc
+        #hardware_rtc
         #tinyusb_device
         pico_multicore
         pico_unique_id
-        IOLIBRARY_FILES
-        ETHERNET_FILES
-        SNTP_FILES
-        FTPSERVER_FILES
-        TIMER_FILES
+        pico_aon_timer
+        pico_cyw43_arch_lwip_threadsafe_background
+        pico_lwip
+        pico_lwip_sntp
         )
 
 # Add the standard include files to the build

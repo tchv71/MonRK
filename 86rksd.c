@@ -16,9 +16,13 @@
 #include "hardware/sync.h"
 #include "gpios.h"
 #include "hardware/pio.h"
-#include "hardware/rtc.h"
+//#include "hardware/rtc.h"
+#include "time.h"
+#include "pico/aon_timer.h"
 #include "pico/multicore.h"
 #include "pico/sync.h"
+#undef ERR_OK
+#include "pico/cyw43_arch.h"
 
 
 #define O_OPEN 0
@@ -551,42 +555,42 @@ uint8_t Calendar_GetDayWeek (RTC_DateTypeDef thisDate)
 	return (ret);
 }
 
-void toDatetime(const RTC_DateTypeDef *rt, datetime_t * t)
+void toDatetime(const RTC_DateTypeDef *rt, struct tm * t)
 {
   if (!t || !rt)
     return;
-  t->day = rt->Date;
-  t->month = rt->Month;
-  t->dotw = rt->WeekDay;
-  t->year = rt->Year + 20000;
+  t->tm_mday = rt->Date;
+  t->tm_mon = rt->Month;
+  t->tm_wday = rt->WeekDay;
+  t->tm_year = rt->Year + 20000;
 }
 
-void toDatetimeT(const RTC_TimeTypeDef *rt, datetime_t * t)
+void toDatetimeT(const RTC_TimeTypeDef *rt, struct tm * t)
 {
   if (!t || !rt)
     return;
-  t->sec = rt->Seconds;
-  t->min = rt->Minutes;
-  t->hour = rt->Hours;
+  t->tm_sec = rt->Seconds;
+  t->tm_min = rt->Minutes;
+  t->tm_hour = rt->Hours;
 }
 
-void toRTC_Date(const  datetime_t * t, RTC_DateTypeDef *rt)
+void toRTC_Date(const  struct tm * t, RTC_DateTypeDef *rt)
 {
   if (!t || !rt)
     return;
-  rt->Date    = t->day  ;
-  rt->Month   = t->month;
-  rt->WeekDay = t->dotw ;
-  rt->Year    = t->year - 2000 ;
+  rt->Date    = t->tm_mday  ;
+  rt->Month   = t->tm_mon;
+  rt->WeekDay = t->tm_wday ;
+  rt->Year    = t->tm_year - 2000 ;
 }
 
-void toRTC_Time(const  datetime_t * t, RTC_TimeTypeDef *rt)
+void toRTC_Time(const  struct tm * t, RTC_TimeTypeDef *rt)
 {
   if (!t || !rt)
     return;
-  rt->Hours   = t->hour ;
-  rt->Minutes = t->min;
-  rt->Seconds = t->sec;
+  rt->Hours   = t->tm_hour ;
+  rt->Minutes = t->tm_min;
+  rt->Seconds = t->tm_sec;
   rt->SecondFraction = 255 ;
   rt->SubSeconds = 0;
 }
@@ -597,8 +601,8 @@ void cmd_get_date()
 {
   sendStart(STA_WAIT);
   RTC_DateTypeDef sDate={0};
-  datetime_t t;
-  if (!rtc_get_datetime(&t))
+  struct tm  t;
+  if (!aon_timer_get_time_calendar(&t))
   {
     lastError = ERR_DATETIME;
     return;
@@ -626,8 +630,8 @@ void cmd_set_date()
 
   // Режим передачи и подтверждение
   sendStart (STA_WAIT);
-  datetime_t t;
-  if (!rtc_get_datetime(&t))
+  struct tm t;
+  if (!aon_timer_get_time_calendar(&t))
   {
     lastError = ERR_DATETIME;
     return;
@@ -635,7 +639,7 @@ void cmd_set_date()
   }
   toDatetime(&sDate, &t);
 
-  if (!rtc_set_datetime(&t))
+  if (!aon_timer_set_time_calendar(&t))
   {
     lastError = ERR_DATETIME;
     return;
@@ -652,8 +656,8 @@ void cmd_get_time()
   sendStart(STA_WAIT);
   RTC_TimeTypeDef sTime={0};
 
-  datetime_t t;
-  if (!rtc_get_datetime(&t))
+  struct tm t;
+  if (!aon_timer_get_time_calendar(&t))
   {
     lastError = ERR_DATETIME;
     return;
@@ -678,8 +682,8 @@ void cmd_set_time()
   sTime.Seconds = wrecv();
   sTime.SecondFraction = wrecv();
   sTime.SubSeconds = wrecv();
-  datetime_t t;
-  if (!rtc_get_datetime(&t))
+  struct tm t;
+  if (!aon_timer_get_time_calendar(&t))
   {
     lastError = ERR_DATETIME;
     return;
@@ -687,7 +691,7 @@ void cmd_set_time()
   }
   toDatetimeT(&sTime, &t);
 
-  if (!rtc_set_datetime(&t))
+  if (!aon_timer_set_time_calendar(&t))
   {
     lastError = ERR_DATETIME;
     return;
@@ -717,13 +721,15 @@ void error()
 void LedOff()
 {
   // Гасим светодиод
-  gpio_put(LED, 0);
+  //gpio_put(LED, 0);
+  cyw43_arch_gpio_put(0, 0);
 }
 
 void LedOn()
 {
   // Зажигаем светодиод
-  gpio_put(LED, 1);
+  //gpio_put(LED, 1);
+  cyw43_arch_gpio_put(0, 1);
 }
 
 
@@ -840,19 +846,7 @@ extern int res;
 //extern const uint fifoWriteSm;
 extern const uint fifoReadSm;
 #define INTS_OFF 0
-
-void __not_in_flash_func(dma_send64)(BYTE *ptr, WORD* pLen);
-
 void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
-{
-  do
-  {
-    dma_send64(ptr, &len);
-    ptr += 32;
-  } while (len);
-}
-
-void __not_in_flash_func(dma_send64)(BYTE *ptr, WORD* pLen)
 {
 #if 1
   gpio_init(DRQ);
@@ -862,11 +856,10 @@ void __not_in_flash_func(dma_send64)(BYTE *ptr, WORD* pLen)
 #if INTS_OFF
   uint32_t ints = save_and_disable_interrupts();
 #endif
-  uint32_t loopCnt = 32;
   do
   {
-    pio_sm_put_blocking(FIFO_PIO, dmaReadSm, (*ptr++) | (0xFF << 8));
-  } while (--(*pLen) && --loopCnt);
+    pio_sm_put_blocking(FIFO_PIO, dmaReadSm, *ptr++ | (0xFF << 8));
+  } while (--len);
 #if INTS_OFF
   restore_interrupts(ints);
 #endif
@@ -881,7 +874,7 @@ void __not_in_flash_func(dma_send64)(BYTE *ptr, WORD* pLen)
   do
   {
     DATA_IN();
-    while (gpio_get_all() & (nIOR_MASK/*  | nDACK_MASK */))
+    while (gpio_get_all() & (nIOR_MASK | nDACK_MASK))
       ;
     DATA_OUT();
     WRITE_DATA(*ptr++); // PORTD = *ptr++;
@@ -945,6 +938,7 @@ int res = 0;
 void main_sd()
 {
   DATA_IN();
+  //multicore_fifo_pop_blocking();
   LedOn();
   // Пауза, пока не стабилизируется питание
   /* delay_ms */ //sleep_ms(500);
@@ -952,7 +946,7 @@ void main_sd()
   // Запуск файловой системы
   if (fs_init())
     error();
-  multicore_fifo_push_blocking(0);
+  //multicore_fifo_push_blocking(0);
   {
     mutex_enter_blocking(&sd_mutex);
     strcpy(buf, "boot/boot.rk");
@@ -973,7 +967,7 @@ void main_sd()
 
       // Гасим светодиод
       LedOff();
-#if 1
+#if 0
     //sendStart(0x45);
     //sendFlush();
 #if 0

@@ -41,6 +41,19 @@ typedef uint8_t   BYTE;
 typedef uint16_t  WORD;
 typedef uint32_t  DWORD;
 
+typedef struct TCP_SERVER_T_
+{
+    struct tcp_pcb *server_pcb;
+    struct tcp_pcb *client_pcb;
+    bool complete;
+    //uint8_t buffer_sent[BUF_SIZE];
+    //uint8_t buffer_recv[BUF_SIZE];
+    int sent_len;
+    int recv_len;
+    int run_count;
+} TCP_SERVER_T;
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
