@@ -734,19 +734,7 @@ void toCpmName(char cpmname[15], const char* filename)
 	}
 }
 
-inline int strlen_i(const char* arg)
-{
-	return (int)strlen(arg);
-}
-
-
-int getArg(char* arg)
-{
-	int slen = strlen_i(arg);
-	if (slen >= 2)
-		arg[slen - 2] = 0;
-	return slen;
-}
+extern int getArg(char* arg);
 
 long proc_ftpd_cpm(char* ftp_buf)
 {

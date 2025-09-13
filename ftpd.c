@@ -34,7 +34,7 @@
 
 static TCP_SERVER_T *tcp_ftp_server_init(void)
 {
-	TCP_SERVER_T *state = malloc(sizeof(TCP_SERVER_T));
+	TCP_SERVER_T *state = calloc(1, sizeof(TCP_SERVER_T));
 	if (!state)
 	{
 		DEBUG_printf("failed to allocate state\n");
@@ -44,10 +44,12 @@ static TCP_SERVER_T *tcp_ftp_server_init(void)
     return state;
 }
 
+extern struct ftpd ftp;
+
 static err_t tcp_ftp_server_close(void *arg)
 {
     TCP_SERVER_T *state = (TCP_SERVER_T *)arg;
-    err_t err = ERR_OK;
+	err_t err = ERR_OK;
     if (state->client_pcb != NULL)
     {
         tcp_arg(state->client_pcb, NULL);
@@ -627,6 +629,8 @@ int getSn_RX_RSR(int s)
 {
 	if (s == CTRL_SOCK)
 		return ftp_rcv_len;
+	if (s == DATA_SOCK)
+		return ftp_rcv_data_len;
 	return 0;
 }
 
@@ -839,6 +843,7 @@ void processFtpCmd(char *dbuf)
 		strcpy(buf, ftp.filename);
 		ftp.fr = fs_create(); // f_open(&(ftp.fil), (const char *)ftp.filename, FA_CREATE_ALWAYS | FA_WRITE);
 		// print_filedsc(&(ftp.fil));
+        BYTE err = ftp.fr;
 		if (ftp.fr == FR_OK)
 		{
 #if defined(_FTP_DEBUG_)
@@ -1159,6 +1164,21 @@ uint8_t ftpd_run(uint8_t *dbuf)
 	return 0;
 }
 
+inline int strlen_i(const char* arg)
+{
+	return (int)strlen(arg);
+}
+
+
+int getArg(char* arg)
+{
+	int slen = strlen_i(arg);
+	if (slen >= 2)
+		arg[slen - 2] = 0;
+	return slen;
+}
+
+
 char proc_ftpd(char *ftp_buf)
 {
 	char **cmdp, *cp, *arg, *tmpstr;
@@ -1211,9 +1231,7 @@ char proc_ftpd(char *ftp_buf)
 #if defined(_FTP_DEBUG_)
 		printf("USER_CMD : %s", arg);
 #endif
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		strcpy(ftp.username, arg);
 		// fsprintf(CTRL_SOCK, givepass);
 		slen = sprintf(sendbuf, "331 Enter PASS command\r\n");
@@ -1232,16 +1250,12 @@ char proc_ftpd(char *ftp_buf)
 #if defined(_FTP_DEBUG_)
 		printf("PASS_CMD : %s", arg);
 #endif
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		ftplogin(arg);
 		break;
 
 	case TYPE_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		switch (arg[0])
 		{
 		case 'A':
@@ -1286,9 +1300,7 @@ char proc_ftpd(char *ftp_buf)
 		break;
 
 	case RETR_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 #if defined(_FTP_DEBUG_)
 		printf("RETR_CMD\r\n");
 #endif
@@ -1339,9 +1351,7 @@ char proc_ftpd(char *ftp_buf)
 
 	case APPE_CMD:
 	case STOR_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 #if defined(_FTP_DEBUG_)
 		printf("STOR_CMD\r\n");
 #endif
@@ -1429,9 +1439,7 @@ char proc_ftpd(char *ftp_buf)
 		break;
 
 	case SIZE_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		if (slen > 3)
 		{
 			tmpstr = strrchr(arg, '/');
@@ -1459,9 +1467,7 @@ char proc_ftpd(char *ftp_buf)
 		break;
 
 	case CWD_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		if (slen > 3)
 		{
 			// arg[slen - 3] = 0x00;
@@ -1518,9 +1524,7 @@ char proc_ftpd(char *ftp_buf)
 
 	case MKD_CMD:
 	case XMKD_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		// strcpy(buf, arg);
 		set_fullpath(arg);
 		if (fs_createdir() != 0) // f_mkdir(arg) != 0)
@@ -1536,9 +1540,7 @@ char proc_ftpd(char *ftp_buf)
 		break;
 
 	case DELE_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		set_fullpath(arg);
 		if (fs_delete() != 0) // f_unlink(arg) != 0)
 		{

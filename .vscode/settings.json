@@ -83,7 +83,8 @@
         "tuple": "cpp",
         "type_traits": "cpp",
         "variant": "cpp",
-        "string.h": "c"
+        "string.h": "c",
+        "memory": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }
