@@ -9,6 +9,7 @@
 #include <sys/cdefs.h>
 #include <pico/platform/sections.h>
 #include <pico/sync.h>
+#include <lwip/ip_addr.h>
 
 #define CONST
 #define USE_DMA 1
@@ -45,12 +46,15 @@ typedef struct TCP_SERVER_T_
 {
     struct tcp_pcb *server_pcb;
     struct tcp_pcb *client_pcb;
+    ip_addr_t remote_addr;
+    uint16_t remote_port;
     bool complete;
     //uint8_t buffer_sent[BUF_SIZE];
     //uint8_t buffer_recv[BUF_SIZE];
     int sent_len;
     int recv_len;
     int run_count;
+    uint8_t sock_state;
 } TCP_SERVER_T;
 
 

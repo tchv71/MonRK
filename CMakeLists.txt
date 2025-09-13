@@ -49,7 +49,7 @@ add_executable(MonRk )
 target_sources(MonRk PRIVATE main.cpp
 # Serial.cpp RP2040USB.cpp
  loop.cpp sd.c 86rksd.c fs.c proto.c usb_msc_driver.c
- cpmfs.c device.c #ftpd.c
+ cpmfs.c device.c ftpd.c
 )
 
 pico_set_program_name(MonRk "MonRK")

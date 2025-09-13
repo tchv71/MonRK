@@ -346,9 +346,11 @@ err_t tcp_server_send_data(void *arg, struct tcp_pcb *tpcb)
     // this method is callback from lwIP, so cyw43_arch_lwip_begin is not required, however you
     // can use this method to cause an assertion in debug mode, if this method is called when
     // cyw43_arch_lwip_begin IS needed
-    cyw43_arch_lwip_check();
+    //cyw43_arch_lwip_check();
     uint16_t size = pStreamOutBufPtr - streamOutBuf;
+    cyw43_arch_lwip_begin();
     err_t err = tcp_write(tpcb, streamOutBuf, size, TCP_WRITE_FLAG_COPY);
+    cyw43_arch_lwip_end();
     if (err != ERR_OK)
     {
         DEBUG_printf("Failed to write data %d\n", err);
@@ -580,7 +582,7 @@ void networkInit()
     rtc_init();
     rtc_set_datetime(&t);
 #endif
-    //ftpd_init(g_net_info.ip);
+    ftpd_init(g_net_info.ip);
     // ftpd_cpm_init(g_net_info.ip);
 
 #endif
@@ -639,7 +641,7 @@ void loop()
 {
     //if (!sntp_done)
     //    sntp_process();
-#if USE_ETHERNET && 0
+#if USE_ETHERNET
     uint8_t retval;
     // mutex_enter_blocking(get_sd_mutex());
     /* Run FTP server */
@@ -651,6 +653,7 @@ void loop()
             ;
     }
     // mutex_exit(get_sd_mutex());
+#if 0
     if ((retval = ftpd_cpm_run(g_ftp_buf_cpm)) < 0)
     {
         //printf(" FTP server error : %d\n", retval);
@@ -658,6 +661,7 @@ void loop()
         while (1)
             ;
     }
+#endif
 #endif
     static uint8_t res;
     static uint16_t len;

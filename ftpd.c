@@ -18,33 +18,285 @@
 //#include "socket.h"
 //#include "stdint.h"
 #include "ftpd.h"
-#define TCP_PORT 4242
+#include <sys/_stdint.h>
+#undef ERR_OK
+#include "pico/cyw43_arch.h"
+#include "pico/stdlib.h"
+#include "lwip/arch.h"
+#include "lwip/pbuf.h"
+#include "lwip/tcp.h"
+
+#define FTP_PORT 21
 #define DEBUG_printf printf
 #define BUF_SIZE 2048
 #define TEST_ITERATIONS 10
 #define POLL_TIME_S 5
 
-typedef struct TCP_SERVER_T_ {
-    struct tcp_pcb *server_pcb;
-    struct tcp_pcb *client_pcb;
-    bool complete;
-    uint8_t buffer_sent[BUF_SIZE];
-    uint8_t buffer_recv[BUF_SIZE];
-    int sent_len;
-    int recv_len;
-    int run_count;
-} TCP_SERVER_T;
-
-static TCP_SERVER_T* tcp_server_init(void) {
-    TCP_SERVER_T *state = calloc(1, sizeof(TCP_SERVER_T));
-    if (!state) {
-        DEBUG_printf("failed to allocate state\n");
-        return NULL;
-    }
+static TCP_SERVER_T *tcp_ftp_server_init(void)
+{
+	TCP_SERVER_T *state = malloc(sizeof(TCP_SERVER_T));
+	if (!state)
+	{
+		DEBUG_printf("failed to allocate state\n");
+		return NULL;
+	}
+	state->sock_state = SOCK_INIT;
     return state;
 }
-/* If you need this header, use it. */
-// #include "stdio_private.h"
+
+static err_t tcp_ftp_server_close(void *arg)
+{
+    TCP_SERVER_T *state = (TCP_SERVER_T *)arg;
+    err_t err = ERR_OK;
+    if (state->client_pcb != NULL)
+    {
+        tcp_arg(state->client_pcb, NULL);
+        tcp_poll(state->client_pcb, NULL, 0);
+        tcp_sent(state->client_pcb, NULL);
+        tcp_recv(state->client_pcb, NULL);
+        tcp_err(state->client_pcb, NULL);
+        err = tcp_close(state->client_pcb);
+        if (err != ERR_OK)
+        {
+            DEBUG_printf("close failed %d, calling abort\n", err);
+            tcp_abort(state->client_pcb);
+            err = ERR_ABRT;
+        }
+        state->client_pcb = NULL;
+    }
+    if (state->server_pcb)
+    {
+        tcp_arg(state->server_pcb, NULL);
+        tcp_close(state->server_pcb);
+        state->server_pcb = NULL;
+    }
+	state->sock_state = SOCK_CLOSED;
+    return err;
+}
+
+static err_t tcp_ftp_server_result(void *arg, int status)
+{
+    TCP_SERVER_T *state = (TCP_SERVER_T *)arg;
+    if (status == 0)
+    {
+        DEBUG_printf("test success\n");
+    }
+    else
+    {
+        DEBUG_printf("test failed %d\n", status);
+    }
+    state->complete = true;
+    return tcp_ftp_server_close(arg);
+}
+
+static err_t tcp_ftp_server_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
+{
+    TCP_SERVER_T *state = (TCP_SERVER_T *)arg;
+    DEBUG_printf("tcp_ftp_server_sent %u\n", len);
+    state->sent_len += len;
+
+    return ERR_OK;
+}
+
+static err_t tcp_server_data_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
+{
+    TCP_SERVER_T *state = (TCP_SERVER_T *)arg;
+    DEBUG_printf("tcp_server_data_sent %u\n", len);
+    state->sent_len += len;
+
+    return ERR_OK;
+}
+
+
+uint8_t ftp_rcv_buf[512]; 
+int ftp_rcv_len = 0;
+uint8_t ftp_rcv_data_buf[2048]; 
+int ftp_rcv_data_len = 0;
+
+struct ftpd ftp;
+
+err_t tcp_ftp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
+{
+    TCP_SERVER_T *state = (TCP_SERVER_T *)arg;
+    if (!p)
+    {
+        return tcp_ftp_server_result(arg, -1);
+    }
+    // this method is callback from lwIP, so cyw43_arch_lwip_begin is not required, however you
+    // can use this method to cause an assertion in debug mode, if this method is called when
+    // cyw43_arch_lwip_begin IS needed
+    cyw43_arch_lwip_begin();
+    if (p->tot_len > 0)
+    {
+        u16_t len = p->tot_len;
+		if (state == ftp.tcp_state)
+		{
+			pbuf_copy_partial(p, ftp_rcv_buf, len, 0);
+			ftp_rcv_len = len;
+		}
+		else
+		{
+			pbuf_copy_partial(p, ftp_rcv_data_buf, len, 0);
+			ftp_rcv_data_len = len;
+		}
+        DEBUG_printf("tcp_ftp_server_recv %d/%d err %d\n", p->tot_len, state->recv_len, err);
+        tcp_recved(tpcb, p->tot_len);
+    }
+    pbuf_free(p);
+	cyw43_arch_lwip_end();
+    return ERR_OK;
+}
+
+err_t tcp_ftp_server_data_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
+{
+    TCP_SERVER_T *state = (TCP_SERVER_T *)arg;
+    if (!p)
+    {
+        return tcp_ftp_server_result(arg, -1);
+    }
+    // this method is callback from lwIP, so cyw43_arch_lwip_begin is not required, however you
+    // can use this method to cause an assertion in debug mode, if this method is called when
+    // cyw43_arch_lwip_begin IS needed
+    cyw43_arch_lwip_begin();
+    if (p->tot_len > 0)
+    {
+        u16_t len = p->tot_len;
+		pbuf_copy_partial(p, ftp_rcv_data_buf, len, 0);
+		ftp_rcv_data_len = len;
+        DEBUG_printf("tcp_ftp_server_data_recv %d/%d err %d\n", p->tot_len, state->recv_len, err);
+        tcp_recved(tpcb, p->tot_len);
+    }
+    pbuf_free(p);
+	cyw43_arch_lwip_end();
+    return ERR_OK;
+}
+
+static err_t tcp_ftp_server_poll(void *arg, struct tcp_pcb *tpcb)
+{
+    DEBUG_printf("tcp_server_poll_fn\n");
+    return tcp_ftp_server_result(arg, 0/*-1*/); // no response is an error?
+	//return 0;
+}
+
+static void tcp_ftp_server_err(void *arg, err_t err)
+{
+    if (err != ERR_ABRT)
+    {
+        DEBUG_printf("tcp_client_err_fn %d\n", err);
+        tcp_ftp_server_result(arg, err);
+    }
+}
+
+static err_t tcp_ftp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err)
+{
+    TCP_SERVER_T *state = (TCP_SERVER_T *)arg;
+    if (err != ERR_OK || client_pcb == NULL)
+    {
+        DEBUG_printf("Failure in accept\n");
+        tcp_ftp_server_result(arg, err);
+        return ERR_VAL;
+    }
+    DEBUG_printf("Client connected\n");
+
+    state->client_pcb = client_pcb;
+    tcp_arg(client_pcb, state);
+    tcp_sent(client_pcb, tcp_ftp_server_sent);
+    tcp_recv(client_pcb, tcp_ftp_server_recv);
+    //tcp_poll(client_pcb, tcp_ftp_server_poll, POLL_TIME_S * 2);
+    tcp_err(client_pcb, tcp_ftp_server_err);
+	state->sock_state = SOCK_ESTABLISHED;
+    return ERR_OK;
+}
+
+static bool tcp_ftp_server_open(void *arg, uint16_t port)
+{
+    TCP_SERVER_T *state = (TCP_SERVER_T *)arg;
+    //DEBUG_printf("Starting server at %s on port %u\n", ip4addr_ntoa(netif_ip4_addr(netif_list)), FTP_PORT);
+
+    struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
+    if (!pcb)
+    {
+        DEBUG_printf("failed to create pcb\n");
+        return false;
+    }
+	state->client_pcb = pcb;
+
+	err_t err = tcp_bind(pcb, NULL, port);
+    if (err)
+    {
+        DEBUG_printf("failed to bind to port %u\n", port);
+        return false;
+    }
+	return true;
+}
+
+static err_t tcp_ftp_server_data_connected(void *arg, struct tcp_pcb *tpcb, err_t err)
+{
+    TCP_SERVER_T *state = (TCP_SERVER_T *)arg;
+	if (err != ERR_OK)
+	{
+		printf("connect failed %d\n", err);
+		return tcp_ftp_server_result(arg, err);
+	}
+	state->sock_state = SOCK_ESTABLISHED;
+	DEBUG_printf("Waiting for buffer from server\n");
+	return ERR_OK;
+}
+
+uint16_t remote_port;
+
+static bool tcp_ftp_server_data_open(void *arg)
+{
+    TCP_SERVER_T *state = (TCP_SERVER_T *)arg;
+    DEBUG_printf("Connecting to %s port %u\n", ip4addr_ntoa(&state->remote_addr), FTP_PORT);
+    state->client_pcb = tcp_new_ip_type(IP_GET_TYPE(&state->remote_addr));
+    if (!state->client_pcb) {
+        DEBUG_printf("failed to create pcb\n");
+        return false;
+    }
+
+    tcp_arg(state->client_pcb, state);
+    //tcp_poll(state->client_pcb, tcp_ftp_server_poll, POLL_TIME_S * 2);
+    tcp_sent(state->client_pcb, tcp_server_data_sent);
+    tcp_recv(state->client_pcb, tcp_ftp_server_data_recv);
+    tcp_err(state->client_pcb, tcp_ftp_server_err);
+
+    //state->buffer_len = 0;
+
+    // cyw43_arch_lwip_begin/end should be used around calls into lwIP to ensure correct locking.
+    // You can omit them if you are in a callback from lwIP. Note that when using pico_cyw_arch_poll
+    // these calls are a no-op and can be omitted, but it is a good practice to use them in
+    // case you switch the cyw43_arch type later.
+    cyw43_arch_lwip_begin();
+    err_t err = tcp_connect(state->client_pcb, &state->remote_addr, state->remote_port, tcp_ftp_server_data_connected);
+    cyw43_arch_lwip_end();
+	state->sock_state = SOCK_SYNSENT;
+
+    return err == ERR_OK;
+}
+
+static bool tcp_ftp_server_listen(void *arg)
+{
+    TCP_SERVER_T *state = (TCP_SERVER_T *)arg;
+
+    state->server_pcb = tcp_listen_with_backlog(state->client_pcb, 1);
+    if (!state->server_pcb)
+    {
+        DEBUG_printf("failed to listen\n");
+        if (state->client_pcb)
+        {
+            tcp_close(state->client_pcb);
+        }
+        return false;
+    }
+
+    tcp_arg(state->server_pcb, state);
+    tcp_accept(state->server_pcb, tcp_ftp_server_accept);
+	state->sock_state = SOCK_LISTEN;
+
+    return true;
+}
+
 
 /* Command table */
 char *commands[] = {
@@ -118,13 +370,11 @@ char sizefail[] = "550 File not found\r\n";
 #endif
 
 un_l2cval remote_ip;
-uint16_t remote_port;
 un_l2cval local_ip;
-uint16_t local_port;
+uint16_t local_port = 35000;
+uint16_t local_port_actual = 35000;
 uint8_t connect_state_control = 0;
 uint8_t connect_state_data = 0;
-
-struct ftpd ftp;
 
 int current_year = 2014;
 int current_month = 12;
@@ -148,7 +398,8 @@ void ftpd_init(uint8_t *src_ip)
 
 	strcpy(ftp.workingdir, "/");
 
-	socket(CTRL_SOCK, Sn_MR_TCP, IPPORT_FTP, 0x0);
+	ftp.tcp_state = tcp_ftp_server_init();
+	//socket(CTRL_SOCK, Sn_MR_TCP, IPPORT_FTP, 0x0);
 }
 
 typedef int FRESULT;
@@ -348,14 +599,348 @@ void set_fullpath(char *arg)
 	strcat(buf, arg);
 }
 
+uint8_t getSn_SR(int s)
+{
+	if (s == CTRL_SOCK)
+		return  ftp.tcp_state ? ftp.tcp_state->sock_state : SOCK_CLOSED;
+	if (s == DATA_SOCK)
+		return  ftp.tcp_data_state ? ftp.tcp_data_state->sock_state : SOCK_CLOSED;
+	return SOCK_CLOSED;
+}
+
+int close(int s)
+{
+	if (s == CTRL_SOCK)
+	{
+		tcp_ftp_server_close(ftp.tcp_state->client_pcb);
+		return 0;
+	}
+	if (s == DATA_SOCK)
+	{
+		tcp_ftp_server_close(ftp.tcp_data_state->client_pcb);
+		return 0;
+	}
+	return -1;
+}
+
+int getSn_RX_RSR(int s)
+{
+	if (s == CTRL_SOCK)
+		return ftp_rcv_len;
+	return 0;
+}
+
+int recv(int s, char *buf, int size)
+{
+	if (s == CTRL_SOCK)
+	{
+		memcpy(buf, ftp_rcv_buf, ftp_rcv_len);
+		int s = ftp_rcv_len;
+		ftp_rcv_len = 0;
+		return s;
+	}
+	if (s == DATA_SOCK)
+	{
+		memcpy(buf, ftp_rcv_data_buf, ftp_rcv_data_len);
+		int s = ftp_rcv_data_len;
+		ftp_rcv_data_len = 0;
+		return s;
+	}
+	return 0;
+}
+
+int disconnect(int s)
+{
+	if (s == CTRL_SOCK)
+	{
+		if (ftp.tcp_state->client_pcb)
+		{
+			err_t err = tcp_close(ftp.tcp_state->client_pcb);
+			ftp.tcp_state->client_pcb = NULL;
+			return err;
+		}
+		return 0;
+	}
+	if (s == DATA_SOCK)
+	{
+		if (ftp.tcp_data_state->client_pcb)
+		{
+			err_t err = tcp_close(ftp.tcp_data_state->client_pcb);
+			ftp.tcp_data_state->client_pcb = NULL;
+			return err;
+		}
+		return 0;
+	}
+	return -1;
+}
+
+#define SOCK_BUSY (-1)
+#define SOCK_OK 0
+
+int8_t socket(uint8_t sn, uint8_t protocol, uint16_t port, uint8_t flag)
+{
+	if (sn== CTRL_SOCK)
+	{
+		ftp.tcp_state = tcp_ftp_server_init();
+		return CTRL_SOCK;
+	}
+	if (sn== DATA_SOCK)
+	{
+		ftp.tcp_data_state = tcp_ftp_server_init();
+		return DATA_SOCK;
+	}
+	return -1;
+}
+
+int8_t listen(uint8_t s)
+{
+	if (s == CTRL_SOCK)
+	{
+       	if (!tcp_ftp_server_open(ftp.tcp_state, FTP_PORT))
+	   		return -1;
+		if (!tcp_ftp_server_listen(ftp.tcp_state))
+			return -1;
+		return 0;
+	}
+	if (s == DATA_SOCK)
+	{
+       	if (!tcp_ftp_server_open(ftp.tcp_data_state, local_port_actual))
+	   		return -1;
+		if (!tcp_ftp_server_listen(ftp.tcp_data_state))
+			return -1;
+		return 0;
+	}
+	return -1;
+
+}
+
+int8_t connect(uint8_t s, uint8_t* ip, uint16_t remote_port)
+{
+	if (s == DATA_SOCK)
+	{
+		memcpy(&ftp.tcp_data_state->remote_addr, ip, sizeof(ip_addr_t));
+		ftp.tcp_data_state->remote_port = remote_port;
+		if (!tcp_ftp_server_data_open(ftp.tcp_data_state))
+	   		return -1;
+		return 0;
+	}
+	return -1;
+}
+
+int send(int s, const uint8_t* pData, int size)
+{
+	if (s == CTRL_SOCK)
+	{
+		cyw43_arch_lwip_begin();
+		tcp_write(ftp.tcp_state->client_pcb, pData, size, TCP_WRITE_FLAG_COPY);
+		tcp_output(ftp.tcp_state->client_pcb);
+		cyw43_arch_lwip_end();
+		return size;
+	}
+	if (s == DATA_SOCK)
+	{
+		cyw43_arch_lwip_begin();
+		tcp_write(ftp.tcp_data_state->client_pcb, pData, size, TCP_WRITE_FLAG_COPY);
+		tcp_output(ftp.tcp_data_state->client_pcb);
+		cyw43_arch_lwip_end();
+		return size;
+	}
+	return 0;
+}
+
+void processFtpCmd(char *dbuf)
+{
+	int size = 0;
+	int ret;
+	switch (ftp.current_cmd)
+	{
+	case LIST_CMD:
+	case MLSD_CMD:
+#if defined(_FTP_DEBUG_)
+		printf("previous size: %d\r\n", size);
+#endif
+		scan_files(ftp.workingdir, dbuf, (int *)&size);
+#if defined(_FTP_DEBUG_)
+		printf("returned size: %d\r\n", size);
+		printf("%s\r\n", dbuf);
+#endif
+		size = strlen(dbuf);
+		char *pData = dbuf;
+		while (size > 0)
+		{
+			int sent = send(DATA_SOCK, pData, size);
+			size -= sent;
+			pData += sent;
+		}
+		ftp.current_cmd = NO_CMD;
+		disconnect(DATA_SOCK);
+		size = sprintf(dbuf, "226 Successfully transferred \"%s\"\r\n", ftp.workingdir);
+		send(CTRL_SOCK, dbuf, size);
+		break;
+
+	case RETR_CMD:
+#if defined(_FTP_DEBUG_)
+		printf("filename to retrieve : %s %d\r\n", ftp.filename, strlen(ftp.filename));
+#endif
+		strcpy(buf, ftp.filename[0] == '/' ? ftp.filename + 1 : ftp.filename);
+		ftp.fr = fs_open();
+		// f_open(&(ftp.fil), (const char *)ftp.filename, FA_READ);
+		// print_filedsc(&(ftp.fil));
+		if (ftp.fr == FR_OK)
+		{
+			fs_getfilesize();
+			DWORD remain_filesize = fs_tmp; // ftp.fil.fsize;
+#if defined(_FTP_DEBUG_)
+			printf("f_open return FR_OK\r\n");
+#endif
+			do
+			{
+#if defined(_FTP_DEBUG_)
+				// printf("remained file size: %d\r\n", ftp.fil.fsize);
+#endif
+				memset(dbuf, 0, _MAX_SS);
+                int send_byte = (remain_filesize > _MAX_SS) ? _MAX_SS : remain_filesize;
+
+				ftp.fr = fs_read0(dbuf, send_byte); // f_read(&(ftp.fil), dbuf, send_byte , &blocklen);
+				int blocklen = send_byte;
+				if (ftp.fr != FR_OK)
+					break;
+#if defined(_FTP_DEBUG_)
+				printf("#");
+				// printf("----->fsize:%d recv:%d len:%d \r\n", remain_filesize, send_byte, blocklen);
+				// printf("----->fn:%s data:%s \r\n", ftp.filename, dbuf);
+#endif
+				send(DATA_SOCK, dbuf, blocklen);
+				remain_filesize -= blocklen;
+			} while (remain_filesize != 0);
+#if defined(_FTP_DEBUG_)
+			printf("\r\nFile read finished\r\n");
+#endif
+			// ftp.fr = f_close(&(ftp.fil));
+		}
+		else
+		{
+#if defined(_FTP_DEBUG_)
+			printf("File Open Error: %d\r\n", ftp.fr);
+#endif
+		}
+		ftp.current_cmd = NO_CMD;
+		disconnect(DATA_SOCK);
+		size = sprintf(dbuf, "226 Successfully transferred \"%s\"\r\n", ftp.filename);
+		send(CTRL_SOCK, dbuf, size);
+		break;
+
+	case STOR_CMD:
+#if defined(_FTP_DEBUG_)
+		printf("filename to store : %s %d\r\n", ftp.filename, strlen(ftp.filename));
+#endif
+		strcpy(buf, ftp.filename);
+		fs_delete();
+		strcpy(buf, ftp.filename);
+		ftp.fr = fs_create(); // f_open(&(ftp.fil), (const char *)ftp.filename, FA_CREATE_ALWAYS | FA_WRITE);
+		// print_filedsc(&(ftp.fil));
+		if (ftp.fr == FR_OK)
+		{
+#if defined(_FTP_DEBUG_)
+			printf("f_open return FR_OK\r\n");
+#endif
+			while (1)
+			{
+				int remain_datasize;
+				if ((remain_datasize = getSn_RX_RSR(DATA_SOCK)) > 0)
+				{
+					while (1)
+					{
+						memset(dbuf, 0, _MAX_SS);
+
+						int recv_byte = (remain_datasize > _MAX_SS) ? _MAX_SS : remain_datasize;
+						fs_wtotal = fs_file_wlen = recv_byte;
+						ftp.fr = fs_write_start();						   // f_write(&(ftp.fil), dbuf, (UINT)ret, &blocklen);
+						ret = recv(DATA_SOCK, fs_file_wbuf, fs_file_wlen); // dbuf, recv_byte);
+						fs_file_wlen = ret;
+						fs_wtotal = fs_file_wlen;
+#if defined(_FTP_DEBUG_)
+						// printf("----->fn:%s data:%s \r\n", ftp.filename, dbuf);
+#endif
+
+#if defined(_FTP_DEBUG_)
+						// printf("----->dsize:%d recv:%d len:%d \r\n", remain_datasize, ret, blocklen);
+#endif
+						remain_datasize -= fs_wtotal;
+
+						if (ftp.fr != FR_OK)
+						{
+#if defined(_FTP_DEBUG_)
+							printf("f_write failed\r\n");
+#endif
+							break;
+						}
+						ftp.fr = fs_write_end();
+						if (ftp.fr != FR_OK)
+						{
+#if defined(_FTP_DEBUG_)
+							printf("f_write failed\r\n");
+#endif
+							break;
+						}
+						if (remain_datasize <= 0)
+							break;
+					}
+
+					if (ftp.fr != FR_OK)
+					{
+#if defined(_FTP_DEBUG_)
+						printf("f_write failed\r\n");
+#endif
+						break;
+					}
+
+#if defined(_FTP_DEBUG_)
+					printf("#");
+#endif
+				}
+				else
+				{
+					if (getSn_SR(DATA_SOCK) != SOCK_ESTABLISHED)
+						break;
+				}
+			}
+#if defined(_FTP_DEBUG_)
+			printf("\r\nFile write finished\r\n");
+#endif
+			ftp.fr = fs_write_eof(); // f_close(&(ftp.fil));
+		}
+		else
+		{
+#if defined(_FTP_DEBUG_)
+			printf("File Open Error: %d\r\n", ftp.fr);
+#endif
+			ftp.current_cmd = NO_CMD;
+			disconnect(DATA_SOCK);
+			size = sprintf(dbuf, "550 No such file or directory.\r\n");
+			send(CTRL_SOCK, dbuf, size);
+			break;
+		}
+
+		// fno.fdate = (WORD)(((current_year - 1980) << 9) | (current_month << 5) | current_day);
+		// fno.ftime = (WORD)((current_hour << 11) | (current_min << 5) | (current_sec >> 1));
+		// f_utime((const char *)ftp.filename, &fno);
+		ftp.current_cmd = NO_CMD;
+		disconnect(DATA_SOCK);
+		size = sprintf(dbuf, "226 Successfully transferred \"%s\"\r\n", ftp.filename);
+		send(CTRL_SOCK, dbuf, size);
+		break;
+
+	case NO_CMD:
+	default:
+		break;
+	}
+}
+
 uint8_t ftpd_run(uint8_t *dbuf)
 {
 	int size = 0, i;
 	long ret = 0;
-	uint32_t blocklen, send_byte, recv_byte;
-	uint32_t remain_filesize;
-	uint32_t remain_datasize;
-
 	// memset(dbuf, 0, sizeof(_MAX_SS));
 
 	switch (getSn_SR(CTRL_SOCK))
@@ -369,7 +954,10 @@ uint8_t ftpd_run(uint8_t *dbuf)
 			// fsprintf(CTRL_SOCK, banner, HOSTNAME, VERSION);
 			strcpy(ftp.workingdir, "/");
 			sprintf((char *)dbuf, "220 %s FTP version %s ready.\r\n", HOSTNAME, VERSION);
+		    cyw43_arch_lwip_begin();
+
 			ret = send(CTRL_SOCK, (uint8_t *)dbuf, strlen((const char *)dbuf));
+			cyw43_arch_lwip_end();
 			if (ret < 0)
 			{
 #if defined(_FTP_DEBUG_)
@@ -393,7 +981,7 @@ uint8_t ftpd_run(uint8_t *dbuf)
 
 			memset(dbuf, 0, FF_MAX_SS);
 
-			if (size > _MAX_SS)
+			if (size >= _MAX_SS)
 				size = _MAX_SS - 1;
 
 			ret = recv(CTRL_SOCK, dbuf, size);
@@ -433,6 +1021,7 @@ uint8_t ftpd_run(uint8_t *dbuf)
 #if defined(_FTP_DEBUG_)
 		printf("%d:FTPStart\r\n", CTRL_SOCK);
 #endif
+#define Sn_MR_TCP 0
 		if ((ret = socket(CTRL_SOCK, Sn_MR_TCP, IPPORT_FTP, 0x0)) != CTRL_SOCK)
 		{
 #if defined(_FTP_DEBUG_)
@@ -477,196 +1066,7 @@ uint8_t ftpd_run(uint8_t *dbuf)
 #endif
 			connect_state_data = 1;
 		}
-
-		switch (ftp.current_cmd)
-		{
-		case LIST_CMD:
-		case MLSD_CMD:
-#if defined(_FTP_DEBUG_)
-			printf("previous size: %d\r\n", size);
-#endif
-			scan_files(ftp.workingdir, dbuf, (int *)&size);
-#if defined(_FTP_DEBUG_)
-			printf("returned size: %d\r\n", size);
-			printf("%s\r\n", dbuf);
-#endif
-			size = strlen(dbuf);
-			char *pData = dbuf;
-			while (size > 0)
-			{
-				int sent = send(DATA_SOCK, pData, size);
-				size -= sent;
-				pData += sent;
-			}
-			ftp.current_cmd = NO_CMD;
-			disconnect(DATA_SOCK);
-			size = sprintf(dbuf, "226 Successfully transferred \"%s\"\r\n", ftp.workingdir);
-			send(CTRL_SOCK, dbuf, size);
-			break;
-
-		case RETR_CMD:
-#if defined(_FTP_DEBUG_)
-			printf("filename to retrieve : %s %d\r\n", ftp.filename, strlen(ftp.filename));
-#endif
-			strcpy(buf, ftp.filename[0] == '/' ? ftp.filename + 1 : ftp.filename);
-			ftp.fr = fs_open();
-			// f_open(&(ftp.fil), (const char *)ftp.filename, FA_READ);
-			// print_filedsc(&(ftp.fil));
-			if (ftp.fr == FR_OK)
-			{
-				fs_getfilesize();
-				remain_filesize = fs_tmp; // ftp.fil.fsize;
-#if defined(_FTP_DEBUG_)
-				printf("f_open return FR_OK\r\n");
-#endif
-				do
-				{
-#if defined(_FTP_DEBUG_)
-					//printf("remained file size: %d\r\n", ftp.fil.fsize);
-#endif
-					memset(dbuf, 0, _MAX_SS);
-
-					if (remain_filesize > _MAX_SS)
-						send_byte = _MAX_SS;
-					else
-						send_byte = remain_filesize;
-
-					ftp.fr = fs_read0(dbuf, send_byte); // f_read(&(ftp.fil), dbuf, send_byte , &blocklen);
-					blocklen = send_byte;
-					if (ftp.fr != FR_OK)
-						break;
-#if defined(_FTP_DEBUG_)
-					printf("#");
-					//printf("----->fsize:%d recv:%d len:%d \r\n", remain_filesize, send_byte, blocklen);
-					//printf("----->fn:%s data:%s \r\n", ftp.filename, dbuf);
-#endif
-					send(DATA_SOCK, dbuf, blocklen);
-					remain_filesize -= blocklen;
-				} while (remain_filesize != 0);
-#if defined(_FTP_DEBUG_)
-				printf("\r\nFile read finished\r\n");
-#endif
-				// ftp.fr = f_close(&(ftp.fil));
-			}
-			else
-			{
-#if defined(_FTP_DEBUG_)
-				printf("File Open Error: %d\r\n", ftp.fr);
-#endif
-			}
-			ftp.current_cmd = NO_CMD;
-			disconnect(DATA_SOCK);
-			size = sprintf(dbuf, "226 Successfully transferred \"%s\"\r\n", ftp.filename);
-			send(CTRL_SOCK, dbuf, size);
-			break;
-
-		case STOR_CMD:
-#if defined(_FTP_DEBUG_)
-			printf("filename to store : %s %d\r\n", ftp.filename, strlen(ftp.filename));
-#endif
-			strcpy(buf, ftp.filename);
-			fs_delete();
-			strcpy(buf, ftp.filename);
-			ftp.fr = fs_create(); // f_open(&(ftp.fil), (const char *)ftp.filename, FA_CREATE_ALWAYS | FA_WRITE);
-			// print_filedsc(&(ftp.fil));
-			if (ftp.fr == FR_OK)
-			{
-#if defined(_FTP_DEBUG_)
-				printf("f_open return FR_OK\r\n");
-#endif
-				while (1)
-				{
-					if ((remain_datasize = getSn_RX_RSR(DATA_SOCK)) > 0)
-					{
-						while (1)
-						{
-							memset(dbuf, 0, _MAX_SS);
-
-							if (remain_datasize > _MAX_SS)
-								recv_byte = _MAX_SS;
-							else
-								recv_byte = remain_datasize;
-							fs_wtotal = fs_file_wlen = recv_byte;
-							ftp.fr = fs_write_start();						   // f_write(&(ftp.fil), dbuf, (UINT)ret, &blocklen);
-							ret = recv(DATA_SOCK, fs_file_wbuf, fs_file_wlen); // dbuf, recv_byte);
-							fs_file_wlen = ret;
-							fs_wtotal = fs_file_wlen;
-#if defined(_FTP_DEBUG_)
-							//printf("----->fn:%s data:%s \r\n", ftp.filename, dbuf);
-#endif
-
-#if defined(_FTP_DEBUG_)
-							//printf("----->dsize:%d recv:%d len:%d \r\n", remain_datasize, ret, blocklen);
-#endif
-							remain_datasize -= fs_wtotal;
-
-							if (ftp.fr != FR_OK)
-							{
-#if defined(_FTP_DEBUG_)
-								printf("f_write failed\r\n");
-#endif
-								break;
-							}
-							ftp.fr = fs_write_end();
-							if (ftp.fr != FR_OK)
-							{
-#if defined(_FTP_DEBUG_)
-								printf("f_write failed\r\n");
-#endif
-								break;
-							}
-							if (remain_datasize <= 0)
-								break;
-						}
-
-						if (ftp.fr != FR_OK)
-						{
-#if defined(_FTP_DEBUG_)
-							printf("f_write failed\r\n");
-#endif
-							break;
-						}
-
-#if defined(_FTP_DEBUG_)
-						printf("#");
-#endif
-					}
-					else
-					{
-						if (getSn_SR(DATA_SOCK) != SOCK_ESTABLISHED)
-							break;
-					}
-				}
-#if defined(_FTP_DEBUG_)
-				printf("\r\nFile write finished\r\n");
-#endif
-				ftp.fr = fs_write_eof(); // f_close(&(ftp.fil));
-			}
-			else
-			{
-#if defined(_FTP_DEBUG_)
-				printf("File Open Error: %d\r\n", ftp.fr);
-#endif
-				ftp.current_cmd = NO_CMD;
-				disconnect(DATA_SOCK);
-				size = sprintf(dbuf, "550 No such file or directory.\r\n");
-				send(CTRL_SOCK, dbuf, size);
-				break;
-			}
-
-			// fno.fdate = (WORD)(((current_year - 1980) << 9) | (current_month << 5) | current_day);
-			// fno.ftime = (WORD)((current_hour << 11) | (current_min << 5) | (current_sec >> 1));
-			// f_utime((const char *)ftp.filename, &fno);
-			ftp.current_cmd = NO_CMD;
-			disconnect(DATA_SOCK);
-			size = sprintf(dbuf, "226 Successfully transferred \"%s\"\r\n", ftp.filename);
-			send(CTRL_SOCK, dbuf, size);
-			break;
-
-		case NO_CMD:
-		default:
-			break;
-		}
+        processFtpCmd(dbuf);
 		break;
 
 	case SOCK_CLOSE_WAIT:
@@ -696,7 +1096,7 @@ uint8_t ftpd_run(uint8_t *dbuf)
 					close(DATA_SOCK);
 					return ret;
 				}
-
+				local_port_actual = local_port;
 				local_port++;
 				if (local_port > 50000)
 					local_port = 35000;
@@ -740,7 +1140,7 @@ uint8_t ftpd_run(uint8_t *dbuf)
 		}
 		else
 		{
-			if ((ret = connect(DATA_SOCK, remote_ip.cVal, remote_port)) != SOCK_OK)
+			if ((ret = connect(DATA_SOCK, (remote_ip.cVal), remote_port)) != SOCK_OK)
 			{
 #if defined(_FTP_DEBUG_)
 				printf("%d:Connect error\r\n", DATA_SOCK);

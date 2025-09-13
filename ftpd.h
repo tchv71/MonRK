@@ -246,7 +246,8 @@ struct ftpd {
 	char username[LINELEN];		/* Arg to USER command */
 	char workingdir[LINELEN];
 	char filename[LINELEN];
-
+    TCP_SERVER_T* tcp_state;
+    TCP_SERVER_T* tcp_data_state;
 #if defined(F_FILESYSTEM)
     FIL fil;	// FatFs File objects
 	//FRESULT fr;	// FatFs function common result code
@@ -278,6 +279,8 @@ long recvfile(uint8_t s);
 #if defined(F_FILESYSTEM)
 void print_filedsc(FIL *fil);
 #endif
+
+#include "sock.h"
 
 #ifdef __cplusplus
 }
