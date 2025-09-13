@@ -95,7 +95,7 @@ char sizefail[] = "550 File not found\r\n";
 un_l2cval remote_ip;
 uint16_t remote_port;
 un_l2cval local_ip;
-uint16_t local_port;
+uint16_t local_port = 35000;
 uint8_t connect_state_control = 0;
 uint8_t connect_state_data = 0;
 
@@ -734,6 +734,20 @@ uint8_t ftpd_run(uint8_t *dbuf)
 	return 0;
 }
 
+inline int strlen_i(const char* arg)
+{
+	return (int)strlen(arg);
+}
+
+
+int getArg(char* arg)
+{
+	int slen = strlen_i(arg);
+	if (slen >= 2)
+		arg[slen - 2] = 0;
+	return slen;
+}
+
 char proc_ftpd(char *ftp_buf)
 {
 	char **cmdp, *cp, *arg, *tmpstr;
@@ -786,9 +800,7 @@ char proc_ftpd(char *ftp_buf)
 #if defined(_FTP_DEBUG_)
 		printf("USER_CMD : %s", arg);
 #endif
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		strcpy(ftp.username, arg);
 		// fsprintf(CTRL_SOCK, givepass);
 		slen = sprintf(sendbuf, "331 Enter PASS command\r\n");
@@ -807,16 +819,12 @@ char proc_ftpd(char *ftp_buf)
 #if defined(_FTP_DEBUG_)
 		printf("PASS_CMD : %s", arg);
 #endif
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		ftplogin(arg);
 		break;
 
 	case TYPE_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		switch (arg[0])
 		{
 		case 'A':
@@ -861,14 +869,12 @@ char proc_ftpd(char *ftp_buf)
 		break;
 
 	case RETR_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 #if defined(_FTP_DEBUG_)
 		printf("RETR_CMD\r\n");
 #endif
-		if (strlen(ftp.workingdir) == 1)
-			sprintf(ftp.filename, "/%s", arg);
+		if (strcmp("/", ftp.workingdir) == 0)
+			sprintf(ftp.filename, /*"/"*/ "%s", arg);
 		else
 			sprintf(ftp.filename, "%s/%s", ftp.workingdir, arg);
 		slen = sprintf(sendbuf, "150 Opening data channel for file download from server of \"%s\"\r\n", ftp.filename);
@@ -914,13 +920,11 @@ char proc_ftpd(char *ftp_buf)
 
 	case APPE_CMD:
 	case STOR_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 #if defined(_FTP_DEBUG_)
 		printf("STOR_CMD\r\n");
 #endif
-		if (strlen(ftp.workingdir) == 0)
+		if (strcmp("/", ftp.workingdir) == 0)
 			sprintf(ftp.filename, /*"/"*/ "%s", arg);
 		else
 			sprintf(ftp.filename, "%s/%s", ftp.workingdir, arg);
@@ -1004,9 +1008,7 @@ char proc_ftpd(char *ftp_buf)
 		break;
 
 	case SIZE_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		if (slen > 3)
 		{
 			tmpstr = strrchr(arg, '/');
@@ -1034,9 +1036,7 @@ char proc_ftpd(char *ftp_buf)
 		break;
 
 	case CWD_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		if (slen > 3)
 		{
 			// arg[slen - 3] = 0x00;
@@ -1093,9 +1093,7 @@ char proc_ftpd(char *ftp_buf)
 
 	case MKD_CMD:
 	case XMKD_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		// strcpy(buf, arg);
 		set_fullpath(arg);
 		if (fs_createdir() != 0) // f_mkdir(arg) != 0)
@@ -1111,9 +1109,7 @@ char proc_ftpd(char *ftp_buf)
 		break;
 
 	case DELE_CMD:
-		slen = strlen(arg);
-		arg[slen - 1] = 0x00;
-		arg[slen - 2] = 0x00;
+		slen = getArg(arg);
 		set_fullpath(arg);
 		if (fs_delete() != 0) // f_unlink(arg) != 0)
 		{
