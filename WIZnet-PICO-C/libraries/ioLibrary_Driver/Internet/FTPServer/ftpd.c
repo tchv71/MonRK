@@ -920,7 +920,7 @@ char proc_ftpd(char *ftp_buf)
 #if defined(_FTP_DEBUG_)
 		printf("STOR_CMD\r\n");
 #endif
-		if (strlen(ftp.workingdir) == 1)
+		if (strlen(ftp.workingdir) == 0)
 			sprintf(ftp.filename, /*"/"*/ "%s", arg);
 		else
 			sprintf(ftp.filename, "%s/%s", ftp.workingdir, arg);
