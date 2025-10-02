@@ -760,6 +760,7 @@ void processFtpCmd(char *dbuf)
 	{
 	case LIST_CMD:
 	case MLSD_CMD:
+	case NLST_CMD:
 #if defined(_FTP_DEBUG_)
 		printf("previous size: %d\r\n", size);
 #endif

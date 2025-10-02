@@ -583,7 +583,7 @@ void networkInit()
     rtc_set_datetime(&t);
 #endif
     ftpd_init(g_net_info.ip);
-    // ftpd_cpm_init(g_net_info.ip);
+    ftpd_cpm_init(g_net_info.ip);
 
 #endif
     /* Get network information */
@@ -653,7 +653,6 @@ void loop()
             ;
     }
     // mutex_exit(get_sd_mutex());
-#if 0
     if ((retval = ftpd_cpm_run(g_ftp_buf_cpm)) < 0)
     {
         //printf(" FTP server error : %d\n", retval);
@@ -661,7 +660,6 @@ void loop()
         while (1)
             ;
     }
-#endif
 #endif
     static uint8_t res;
     static uint16_t len;
