@@ -12,7 +12,7 @@
 #include <lwip/ip_addr.h>
 
 #define CONST
-#define USE_DMA 1
+#define USE_DMA 0//1
 #define USE_ETHERNET 1
 #define USE_SERIAL_DEBUG 1
 
@@ -31,6 +31,18 @@ enum
 #define nIOR  7
 #define DIR   8
 #define LED   25
+
+#define A0_PIN 0
+#define A1_PIN 1
+#define nCS2_PIN 2
+#define nWR_PIN nIOW
+#define nRD_PIN nIOR
+
+#define A0_MASK   (1 << A0_PIN)
+#define A1_MASK   (1 << A1_PIN)
+#define nCS2_MASK (1 << nCS2_PIN)
+#define nWR_MASK  (1 << nWR_PIN)
+#define nRD_MASK  (1 << nRD_PIN)
 
 #define DRQ_MASK   (1 << DRQ)
 #define nDACK_MASK (1 << nDACK)
@@ -61,7 +73,7 @@ typedef struct TCP_SERVER_T_
 #ifdef __cplusplus
 extern "C" {
 #endif
-mutex_t* get_sd_mutex();
+    mutex_t *get_sd_mutex();
 #ifdef __cplusplus
 }
 #endif

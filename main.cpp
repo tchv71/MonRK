@@ -102,7 +102,6 @@ void dmaPioInit()
     pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true/* false */);
 
 
-#if 1
     int dmaReadProgOffset = pio_add_program(FIFO_PIO, &dmaRead_program);
     if (dmaReadProgOffset<0)
         panic("Failed add dmaReadProgram");
@@ -118,7 +117,6 @@ void dmaPioInit()
 
     pio_sm_init(FIFO_PIO, dmaReadSm, dmaReadProgOffset, &readDmaConfig);
     pio_sm_set_enabled(FIFO_PIO, dmaReadSm, true);
-#endif
 }
 
 void setup1()
@@ -129,6 +127,8 @@ void setup1()
     //gpio_set_function(SPI_CSn, GPIO_FUNC_SPI);
     gpio_set_function(SPI_SCK, GPIO_FUNC_SPI);
     gpio_set_function(SPI_TX, GPIO_FUNC_SPI);
+
+    gpio_init_mask(A0_MASK | A1_MASK | nCS2_MASK | GPIO_CD_MASK | nWR_MASK | nRD_MASK);
 
     gpio_init (SPI_CSn);
     gpio_put (SPI_CSn, 1);

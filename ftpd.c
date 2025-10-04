@@ -1165,7 +1165,7 @@ uint8_t ftpd_run(uint8_t *dbuf)
 	return 0;
 }
 
-inline int strlen_i(const char* arg)
+static int strlen_i(const char* arg)
 {
 	return (int)strlen(arg);
 }

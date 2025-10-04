@@ -831,12 +831,6 @@ BYTE RkSd_Loop()
   }
 }
 
-#ifdef USE_DMA
-
-static inline void WRITE_DATA(BYTE c)
-{
-  gpio_put_masked(GPIO_CD_MASK, ((uint32_t)c) << GPIO_CD7);
-}
 //const uint dmaReadSm = 0;
 const uint dmaWriteSm = 0;
 const uint dmaReadSm = 1;
@@ -886,11 +880,6 @@ void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
 #endif
 }
 
-static inline BYTE READ_DATA()
-{
-  return (gpio_get_all() & GPIO_CD_MASK) >> GPIO_CD7;
-}
-
 void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
 {
 #if 1
@@ -925,12 +914,127 @@ void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
   restore_interrupts(ints);
 #endif
 }
+#if USE_DMA
+
+static inline void WRITE_DATA(BYTE c)
+{
+  gpio_put_masked(GPIO_CD_MASK, ((uint32_t)c) << GPIO_CD7);
+}
+
+static inline BYTE READ_DATA()
+{
+  return (gpio_get_all() & GPIO_CD_MASK) >> GPIO_CD7;
+}
+
+#else // !USE_DMA
+static inline void WRITE_DATA(BYTE c)
+{
+  uint32_t val;
+  do
+  {
+    val = gpio_get_all();
+  }
+  while ((val & (nCS2_MASK | nRD_MASK))!=0);   
+  gpio_set_dir_out_masked(GPIO_CD_MASK);
+  gpio_put_masked(GPIO_CD_MASK, ((uint32_t)c) << GPIO_CD7);
+  do
+  {
+    val = gpio_get_all();
+  }
+  while ((val & (nCS2_MASK | nRD_MASK))==0);   
+  gpio_set_dir_in_masked(GPIO_CD_MASK);
+}
+
+uint8_t v55_buf[4] = {0,0,0,0};
+
+static inline uint16_t READ_ADDR()
+{
+  return *(uint16_t*)&v55_buf[1];// | (((uint32_t)v55_buf[2]) << 8);
+}
+
+static inline void WAIT_RW_BYTE()
+{
+  uint32_t val;
+  do
+  {
+    val = gpio_get_all();
+  } while ((val & nCS2_MASK) !=0 || (val & (nWR_MASK | nRD_MASK)) == (nWR_MASK | nRD_MASK));
+  uint8_t addr = (val & (A0_MASK | A1_MASK)) >> A0_PIN;
+  if ((val & nRD_MASK) == 0)
+  {
+    v55_buf[0] = rom[READ_ADDR() & 0x7f];
+    gpio_put_masked(GPIO_CD_MASK, ((uint32_t)v55_buf[addr]) << GPIO_CD7);
+    gpio_set_dir_out_masked(GPIO_CD_MASK);
+    do
+    {
+      val = gpio_get_all();
+    } while ((val & (nCS2_MASK | nRD_MASK)) == 0);
+    gpio_put_masked(GPIO_CD_MASK, ((uint32_t)v55_buf[addr]) << GPIO_CD7);
+    gpio_put_masked(GPIO_CD_MASK, ((uint32_t)v55_buf[addr]) << GPIO_CD7);
+    gpio_set_dir_in_masked(GPIO_CD_MASK);
+    int i = 0;
+  }
+  else
+  {
+    do
+    {
+      val = gpio_get_all();
+    } while ((val & (nCS2_MASK | nWR_MASK)) == 0);
+    uint8_t v = (val & GPIO_CD_MASK) >> GPIO_CD7;
+    v55_buf[addr] = v;
+  }
+}
+
 #endif
 
+//void RkSd_main();
+
+void wait()
+{
+#if !USE_DMA
+  // Ждем перепад 1->0 A5
+  while ((v55_buf[1] & 0x20) == 0)
+    WAIT_RW_BYTE();
+  while ((v55_buf[1] & 0x20) != 0)
+    WAIT_RW_BYTE();
+  uint32_t addr = READ_ADDR ();
+  if ((addr & 0x3f) == 0)
+    return;
+  //RkSd_main ();
+#endif
+}
 auto_init_mutex(sd_mutex);
 mutex_t* get_sd_mutex()
 {
   return &sd_mutex;
+}
+
+void __not_in_flash_func(EmulateRom)()
+{
+  BYTE lastAddr = 0;
+  uint32_t ints = save_and_disable_interrupts();
+  memset(v55_buf, 0, sizeof(v55_buf));
+  while (1)
+  {
+    WAIT_RW_BYTE();
+    uint16_t addr = READ_ADDR();
+    if (addr == 0x44)
+    {
+      lastAddr = 0x44;
+    }
+    else if (addr == 0x40)
+    {
+      lastAddr = (lastAddr == 0x44) ? 0x40 : 0;
+    }
+    else if (addr == 0)
+    {
+      if (lastAddr == 0x40)
+        break;
+      else
+        lastAddr = 0;
+    }
+  }
+  restore_interrupts(ints);
 }
 
 
@@ -987,6 +1091,9 @@ void main_sd()
     mutex_exit(&sd_mutex);
   }
   //while (true) ;
+#if !USE_DMA
+   EmulateRom();
+#endif
   while (1)
   {
     if (!RkSd_Loop())
