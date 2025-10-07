@@ -61,7 +61,7 @@ void __not_in_flash_func(pio_irq_handler_write)()
 {
     uint32_t writeVal = DMA_PIO->rxf[fifoWrite2Sm];
 
-    if ((writeVal & (GPIO_A0_MASK >> GPIO_CD7)) == 0) // write val
+    if ((writeVal & (GPIO_A0_MASK >> PIN_CD7)) == 0) // write val
     {
         uint8_t c = writeVal & 0xff;
         *pStreamOutBufPtr++ = c;
@@ -79,6 +79,50 @@ void __not_in_flash_func(pio_irq_handler_write)()
     updateFifoReadAhead();
 }
 
+extern "C" const uint dmaRomSm;
+
+volatile uint16_t addr = 0;
+static uint16_t lastAddr = 0;
+volatile bool bStopRomEmu = false;
+
+void __not_in_flash_func(pio_irq_handler_rom)()
+{
+    if (pio_sm_is_rx_fifo_empty(FIFO_PIO, dmaRomSm))
+        return;
+    uint32_t val = pio_sm_get_blocking(FIFO_PIO, dmaRomSm); // FIFO_PIO->rxf[dmaRomSm];
+
+    uint8_t w_addr = (val & (A0_MASK | A1_MASK)) >> PIN_A0;
+    switch (w_addr)
+    {
+    case 1:
+        addr = (val & GPIO_CD_MASK) >> PIN_CD7;
+        break;
+    case 2:
+    {
+        addr |= (val & GPIO_CD_MASK) >> (PIN_CD7 - 8);
+        uint8_t r_val = rom[addr & 0x7f];
+        pio_sm_put(FIFO_PIO, dmaRomSm, 0xFF << 8 | r_val);
+        if (addr == 0x44)
+        {
+            lastAddr = 0x44;
+        }
+        else if (addr == 0x40)
+        {
+            lastAddr = (lastAddr == 0x44) ? 0x40 : 0;
+        }
+        else if (addr == 0)
+        {
+            if (lastAddr == 0x40)
+                bStopRomEmu = true;
+            else
+                lastAddr = 0;
+        }
+    }
+    break;
+    default:
+        break;
+    }
+}
 //     1   1   2   2   3   3   0   0
 //     0   0   0   0   0   0   1   1
 // B   _______|_______|_______|_______|_______|_______|
@@ -133,43 +177,47 @@ void fifoPioInit()
 
     for (uint i = 0; i < 8; ++i)
     {
-        pio_gpio_init(FIFO_PIO, GPIO_CD7 + i);
+        pio_gpio_init(FIFO_PIO, PIN_CD7 + i);
+        gpio_set_drive_strength( PIN_CD7 + i, GPIO_DRIVE_STRENGTH_12MA);
     }
-    pio_gpio_init(FIFO_PIO, DIR);
+    pio_gpio_init(FIFO_PIO, PIN_DIR);
     pio_sm_set_pins_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
     pio_sm_set_pindirs_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
     // pio_sm_set_consecutive_pindirs(FIFO_PIO, fifoReadSm, DIR, 1, true);
 
+    /* fifoReadProg */
     pio_sm_config readFifoConfig = fifoRead_program_get_default_config(fifoReadProgOffset);
-    sm_config_set_in_pins(&readFifoConfig, GPIO_CSR);
-    sm_config_set_jmp_pin(&readFifoConfig, GPIO_A0);
-    sm_config_set_sideset_pin_base(&readFifoConfig, DIR);
-    sm_config_set_out_pins(&readFifoConfig, GPIO_CD7, 8);
+    sm_config_set_in_pins(&readFifoConfig, PIN_CSR);
+    sm_config_set_jmp_pin(&readFifoConfig, PIN_A0_28);
+    sm_config_set_sideset_pin_base(&readFifoConfig, PIN_DIR);
+    sm_config_set_out_pins(&readFifoConfig, PIN_CD7, 8);
     sm_config_set_in_shift(&readFifoConfig, true, false, 32);  // R shift
     sm_config_set_out_shift(&readFifoConfig, true, false, 32); // R shift
     sm_config_set_clkdiv(&readFifoConfig, 1.0f);
-
+    //
     pio_sm_init(FIFO_PIO, fifoReadSm, fifoReadProgOffset, &readFifoConfig);
     pio_sm_set_enabled(FIFO_PIO, fifoReadSm, true);
     pio_set_irq0_source_enabled(FIFO_PIO, pis_sm0_rx_fifo_not_empty, true);
     irq_set_exclusive_handler(PIO0_IRQ_0, pio_irq_handler_read);
     irq_set_enabled(PIO0_IRQ_0, true);
 
-    irq_set_exclusive_handler(PIO1_IRQ_1, pio_irq_handler_write);
-    irq_set_enabled(PIO1_IRQ_1, true);
+#if 1
+    /* fifoWriteProg */
     int fifoWriteProgOffset = pio_add_program(DMA_PIO, &fifoWrite_program);
     if (fifoWriteProgOffset < 0)
         panic("Failed add fifoWriteProgram");
-
     pio_sm_config writeConfig2 = fifoWrite_program_get_default_config(fifoWriteProgOffset);
-    sm_config_set_in_pins(&writeConfig2, GPIO_CD7);
+    sm_config_set_in_pins(&writeConfig2, PIN_CD7);
     sm_config_set_in_shift(&writeConfig2, false, true, 16); // L shift, autopush @ 16 bits
     sm_config_set_clkdiv(&writeConfig2, 1.0f);
-
+    //
     pio_sm_init(DMA_PIO, fifoWrite2Sm, fifoWriteProgOffset, &writeConfig2);
     pio_sm_set_enabled(DMA_PIO, fifoWrite2Sm, true);
-    pio_set_irq1_source_enabled(DMA_PIO, pis_sm1_rx_fifo_not_empty, true);
-
+    // pio_set_irq1_source_enabled(DMA_PIO, pis_sm1_rx_fifo_not_empty, true);
+    // irq_set_exclusive_handler(PIO1_IRQ_1, pio_irq_handler_write);
+    // irq_set_enabled(PIO1_IRQ_1, true);
+    //enable_interrupts();
+#endif
     updateFifoReadAhead();
 #endif
 }
@@ -689,13 +737,13 @@ void loop()
         {
             *pStreamInBufEnd++ = serial.read();
         }
-        uint32_t ints = save_and_disable_interrupts();
+        //uint32_t ints = save_and_disable_interrupts();
         //  if (currentStatus & RXEMPTY)
         //      pio_sm_clear_fifos(FIFO_PIO, fifoReadSm);
         nextValue = *pStreamInBufPtr++;
         currentStatus &= ~RXEMPTY;
         outLength = 0xFF;
-        restore_interrupts_from_disabled(ints);
+        //restore_interrupts_from_disabled(ints);
         //updateFifoReadAhead();
     }
 

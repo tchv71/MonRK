@@ -25,30 +25,30 @@ enum
 }; 
 #define _SPI spi1
 #define BAUD (1000*1000)
-#define DRQ   4
-#define nDACK 5
-#define nIOW  6
-#define nIOR  7
-#define DIR   8
-#define LED   25
+#define PIN_DRQ   4
+#define PIN_nDACK 5
+#define PIN_nIOW  6
+#define PIN_nIOR  7
+#define PIN_DIR   8
+#define PIN_LED   25
 
-#define A0_PIN 0
-#define A1_PIN 1
-#define nCS2_PIN 2
-#define nWR_PIN nIOW
-#define nRD_PIN nIOR
+#define PIN_A0 0
+#define PIN_A1 1
+#define PIN_nCS2 2
+#define PIN_nWR PIN_nIOW
+#define PIN_nRD PIN_nIOR
 
-#define A0_MASK   (1 << A0_PIN)
-#define A1_MASK   (1 << A1_PIN)
-#define nCS2_MASK (1 << nCS2_PIN)
-#define nWR_MASK  (1 << nWR_PIN)
-#define nRD_MASK  (1 << nRD_PIN)
+#define A0_MASK   (1 << PIN_A0)
+#define A1_MASK   (1 << PIN_A1)
+#define nCS2_MASK (1 << PIN_nCS2)
+#define nWR_MASK  (1 << PIN_nWR)
+#define nRD_MASK  (1 << PIN_nRD)
 
-#define DRQ_MASK   (1 << DRQ)
-#define nDACK_MASK (1 << nDACK)
-#define nIOW_MASK  (1 << nIOW)
-#define nIOR_MASK  (1 << nIOR)
-#define DIR_MASK   (1 << DIR)
+#define DRQ_MASK   (1 << PIN_DRQ)
+#define nDACK_MASK (1 << PIN_nDACK)
+#define nIOW_MASK  (1 << PIN_nIOW)
+#define nIOR_MASK  (1 << PIN_nIOR)
+#define DIR_MASK   (1 << PIN_DIR)
 
 typedef uint8_t   BYTE;
 typedef uint16_t  WORD;
