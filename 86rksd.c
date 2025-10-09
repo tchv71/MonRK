@@ -717,13 +717,13 @@ void error()
 void LedOff()
 {
   // Гасим светодиод
-  gpio_put(LED, 0);
+  gpio_put(PIN_LED, 0);
 }
 
 void LedOn()
 {
   // Зажигаем светодиод
-  gpio_put(LED, 1);
+  gpio_put(PIN_LED, 1);
 }
 
 
@@ -829,7 +829,7 @@ BYTE RkSd_Loop()
 
 static inline void WRITE_DATA(BYTE c)
 {
-  gpio_put_masked(GPIO_CD_MASK, ((uint32_t)c) << GPIO_CD7);
+  gpio_put_masked(GPIO_CD_MASK, ((uint32_t)c) << PIN_CD7);
 }
 //const uint dmaReadSm = 0;
 const uint dmaWriteSm = 0;
@@ -855,10 +855,10 @@ void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
 void __not_in_flash_func(dma_send64)(BYTE *ptr, WORD* pLen)
 {
 #if 1
-  gpio_init(DRQ);
-  gpio_put(DRQ, 1);
-  gpio_set_dir(DRQ, GPIO_OUT);
-  pio_gpio_init(FIFO_PIO, DIR);
+  gpio_init(PIN_DRQ);
+  gpio_put(PIN_DRQ, 1);
+  gpio_set_dir(PIN_DRQ, GPIO_OUT);
+  pio_gpio_init(FIFO_PIO, PIN_DIR);
 #if INTS_OFF
   uint32_t ints = save_and_disable_interrupts();
 #endif
@@ -871,8 +871,8 @@ void __not_in_flash_func(dma_send64)(BYTE *ptr, WORD* pLen)
   restore_interrupts(ints);
 #endif
   while (!pio_sm_is_tx_fifo_empty(FIFO_PIO, dmaReadSm)) ;
-  while (gpio_get(nDACK) != 0) ;
-  gpio_put(DRQ, 0);
+  while (gpio_get(PIN_nDACK) != 0) ;
+  gpio_put(PIN_DRQ, 0);
 #else
   gpio_init(DRQ);
   gpio_put(DRQ, 1);
@@ -895,7 +895,7 @@ void __not_in_flash_func(dma_send64)(BYTE *ptr, WORD* pLen)
 
 static inline BYTE READ_DATA()
 {
-  return (gpio_get_all() & GPIO_CD_MASK) >> GPIO_CD7;
+  return (gpio_get_all() & GPIO_CD_MASK) >> PIN_CD7;
 }
 
 void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
@@ -915,7 +915,7 @@ void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
 #if INTS_OFF
   restore_interrupts(ints);
 #endif
-  gpio_put(DRQ, 0);
+  gpio_put(PIN_DRQ, 0);
   #else
   DATA_IN();
   gpio_put(DRQ, 1);

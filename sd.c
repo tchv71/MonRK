@@ -20,6 +20,7 @@ Version 0.99 5-05-2013
 #include <hardware/spi.h>
 #include <hardware/gpio.h>
 #include "spi_sd.h"
+#include "gpios.h"
 
 BYTE sd_sdhc; /* Используется SDHC карта */
 

@@ -93,8 +93,8 @@ void dmaPioInit()
     uint dmaWriteProgram = pio_add_program(DMA_PIO, &dmaWrite_program);
 
     pio_sm_config writeConfig = dmaWrite_program_get_default_config(dmaWriteProgram);
-    sm_config_set_jmp_pin(&writeConfig, nDACK);
-    sm_config_set_in_pins(&writeConfig, GPIO_CD7);
+    sm_config_set_jmp_pin(&writeConfig, PIN_nDACK);
+    sm_config_set_in_pins(&writeConfig, PIN_CD7);
     sm_config_set_in_shift(&writeConfig, false, true, 16); // L shift, autopush @ 16 bits
     sm_config_set_clkdiv(&writeConfig, 1.0f);
 
@@ -109,9 +109,9 @@ void dmaPioInit()
 
     pio_sm_config readDmaConfig = dmaRead_program_get_default_config(dmaReadProgOffset);
     //sm_config_set_in_pins(&readDmaConfig, GPIO_CSR);
-    sm_config_set_jmp_pin(&readDmaConfig, nDACK);
-    sm_config_set_sideset_pin_base(&readDmaConfig, DIR);
-    sm_config_set_out_pins(&readDmaConfig, GPIO_CD7, 8);
+    sm_config_set_jmp_pin(&readDmaConfig, PIN_nDACK);
+    sm_config_set_sideset_pin_base(&readDmaConfig, PIN_DIR);
+    sm_config_set_out_pins(&readDmaConfig, PIN_CD7, 8);
     sm_config_set_in_shift(&readDmaConfig, true, false, 32); // R shift
     sm_config_set_out_shift(&readDmaConfig, true, false, 32); // R shift
     sm_config_set_clkdiv(&readDmaConfig, 1.0f);
@@ -134,9 +134,9 @@ void setup1()
     gpio_put (SPI_CSn, 1);
     gpio_set_dir (SPI_CSn, GPIO_OUT);
  
-    gpio_init (DRQ);
-    gpio_put (DRQ, 0);
-    gpio_set_dir (DRQ, GPIO_OUT);
+    gpio_init (PIN_DRQ);
+    gpio_put (PIN_DRQ, 0);
+    gpio_set_dir (PIN_DRQ, GPIO_OUT);
 
     gpio_init(25);
     gpio_set_dir(25, GPIO_OUT);

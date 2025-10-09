@@ -62,7 +62,7 @@ void __not_in_flash_func(pio_irq_handler_write)()
 {
     uint32_t writeVal =  DMA_PIO->rxf[fifoWrite2Sm];
 
-    if ((writeVal & (GPIO_A0_MASK >> GPIO_CD7)) == 0) // write val
+    if ((writeVal & (GPIO_A0_MASK >> PIN_CD7)) == 0) // write val
     {
         uint8_t c = writeVal & 0xff;
         *pStreamOutBufPtr++ = c;
@@ -134,18 +134,18 @@ void fifoPioInit()
 
     for (uint i = 0; i < 8; ++i)
     {
-        pio_gpio_init(FIFO_PIO, GPIO_CD7 + i);
+        pio_gpio_init(FIFO_PIO, PIN_CD7 + i);
     }
-    pio_gpio_init(FIFO_PIO, DIR);
+    pio_gpio_init(FIFO_PIO, PIN_DIR);
     pio_sm_set_pins_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
     pio_sm_set_pindirs_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
     //pio_sm_set_consecutive_pindirs(FIFO_PIO, fifoReadSm, DIR, 1, true);
 
     pio_sm_config readFifoConfig = fifoRead_program_get_default_config(fifoReadProgOffset);
-    sm_config_set_in_pins(&readFifoConfig, GPIO_CSR);
-    sm_config_set_jmp_pin(&readFifoConfig, GPIO_A0);
-    sm_config_set_sideset_pin_base(&readFifoConfig, DIR);
-    sm_config_set_out_pins(&readFifoConfig, GPIO_CD7, 8);
+    sm_config_set_in_pins(&readFifoConfig, PIN_CSR);
+    sm_config_set_jmp_pin(&readFifoConfig, PIN_A0);
+    sm_config_set_sideset_pin_base(&readFifoConfig, PIN_DIR);
+    sm_config_set_out_pins(&readFifoConfig, PIN_CD7, 8);
     sm_config_set_in_shift(&readFifoConfig, true, false, 32); // R shift
     sm_config_set_out_shift(&readFifoConfig, true, false, 32); // R shift
     sm_config_set_clkdiv(&readFifoConfig, 1.0f);
@@ -163,7 +163,7 @@ void fifoPioInit()
         panic("Failed add fifoWriteProgram");
 
     pio_sm_config writeConfig2 = fifoWrite_program_get_default_config(fifoWriteProgOffset);
-    sm_config_set_in_pins(&writeConfig2, GPIO_CD7);
+    sm_config_set_in_pins(&writeConfig2, PIN_CD7);
     sm_config_set_in_shift(&writeConfig2, false, true, 16); // L shift, autopush @ 16 bits
     sm_config_set_clkdiv(&writeConfig2, 1.0f);
 

@@ -22,20 +22,6 @@ enum
     SPI_SCK = 10,
     SPI_TX  = 11
 }; 
-#define _SPI spi1
-#define BAUD (1000*1000)
-#define DRQ   4
-#define nDACK 5
-#define nIOW  6
-#define nIOR  7
-#define DIR   8
-#define LED   25
-
-#define DRQ_MASK   (1 << DRQ)
-#define nDACK_MASK (1 << nDACK)
-#define nIOW_MASK  (1 << nIOW)
-#define nIOR_MASK  (1 << nIOR)
-#define DIR_MASK   (1 << DIR)
 
 typedef uint8_t   BYTE;
 typedef uint16_t  WORD;
