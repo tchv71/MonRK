@@ -7,9 +7,9 @@
 #include "sys/reent.h"
 #include <cstdlib>
 #include <cstring>
-//#include "tusb.h"
-//#include "RP2040USB.h"
-//#include "Serial.h"
+// #include "tusb.h"
+// #include "RP2040USB.h"
+// #include "Serial.h"
 #include "gpios.h"
 #include <hardware/vreg.h>
 #include <hardware/clocks.h>
@@ -17,8 +17,6 @@
 #include <common.h>
 #include "fifo.pio.h"
 #include "pico/sync.h"
-
-
 
 extern void setup();
 extern void loop();
@@ -78,10 +76,8 @@ extern "C" const uint dmaRomSm;
 extern const uint dmaReadSm;
 extern "C" const uint fifoWrite2Sm;
 
-
 extern void __not_in_flash_func(pio_irq_handler_write)();
 extern void __not_in_flash_func(pio_irq_handler_rom)();
-
 
 /*
  * Set up PIOs for pico <-> CPU interface
@@ -104,7 +100,7 @@ void dmaPioInit()
     sm_config_set_out_pins(&romConfig, PIN_CD7, 8);
 #define SH_LEFT false
 #define SH_RIGHT true
-    sm_config_set_in_shift(&romConfig, SH_LEFT, false, 32); // L shift
+    sm_config_set_in_shift(&romConfig, SH_LEFT, false, 32);   // L shift
     sm_config_set_out_shift(&romConfig, SH_RIGHT, false, 32); // R shift
     sm_config_set_clkdiv(&romConfig, 1.0f);
 
@@ -112,7 +108,7 @@ void dmaPioInit()
     pio_set_irq1_source_enabled(FIFO_PIO, pis_sm1_rx_fifo_not_empty, true);
     irq_set_exclusive_handler(PIO0_IRQ_1, pio_irq_handler_rom);
     irq_set_enabled(PIO0_IRQ_1, true);
-    pio_sm_set_enabled(FIFO_PIO, dmaRomSm, true/* false */);
+    pio_sm_set_enabled(FIFO_PIO, dmaRomSm, true /* false */);
 
 #if 0
     int dmaReadProgOffset = pio_add_program(FIFO_PIO, &dmaRead_program);
@@ -134,23 +130,23 @@ void dmaPioInit()
 }
 
 void setup1()
-{    
-    spi_init (_SPI, BAUD);
+{
+    spi_init(_SPI, BAUD);
     spi_set_format(_SPI, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
     gpio_set_function(PIN_SPI_RX, GPIO_FUNC_SPI);
-    //gpio_set_function(PIN_SPI_CSn, GPIO_FUNC_SPI);
+    // gpio_set_function(PIN_SPI_CSn, GPIO_FUNC_SPI);
     gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI);
     gpio_set_function(PIN_SPI_TX, GPIO_FUNC_SPI);
 
-    gpio_init_mask(A0_MASK | A1_MASK | nCS2_MASK | /* GPIO_CD_MASK |  */nWR_MASK | nRD_MASK);
+    gpio_init_mask(A0_MASK | A1_MASK | nCS2_MASK | /* GPIO_CD_MASK |  */ nWR_MASK | nRD_MASK);
 
-    gpio_init (PIN_SPI_CSn);
-    gpio_put (PIN_SPI_CSn, 1);
-    gpio_set_dir (PIN_SPI_CSn, GPIO_OUT);
- 
-    gpio_init (PIN_DRQ);
-    gpio_put (PIN_DRQ, 0);
-    gpio_set_dir (PIN_DRQ, GPIO_OUT);
+    gpio_init(PIN_SPI_CSn);
+    gpio_put(PIN_SPI_CSn, 1);
+    gpio_set_dir(PIN_SPI_CSn, GPIO_OUT);
+
+    gpio_init(PIN_DRQ);
+    gpio_put(PIN_DRQ, 0);
+    gpio_set_dir(PIN_DRQ, GPIO_OUT);
 
     gpio_init(PIN_nDACK);
     gpio_set_dir(PIN_nDACK, GPIO_IN);
@@ -173,7 +169,7 @@ void setup1()
 
 void loop1()
 {
-    main_sd(); 
+    main_sd();
 }
 
 void main1()
@@ -187,7 +183,7 @@ void main1()
     }
 }
 
-//extern SerialUSB serial;
+// extern SerialUSB serial;
 /* file globals */
 
 extern void fifoPioInit();
@@ -197,15 +193,15 @@ void setup()
 {
     gpio_init_mask(GPIO_CD_MASK | GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
     gpio_set_dir_in_masked(GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
-    gpio_init (PIN_DIR);
-    gpio_put (PIN_DIR, 0);
-    gpio_set_dir (PIN_DIR, GPIO_OUT);
+    gpio_init(PIN_DIR);
+    gpio_put(PIN_DIR, 0);
+    gpio_set_dir(PIN_DIR, GPIO_OUT);
     gpio_set_drive_strength(PIN_DIR, GPIO_DRIVE_STRENGTH_12MA);
     gpio_pull_up(PIN_CD7);
 
     fifoPioInit();
     pio_sm_claim(FIFO_PIO, dmaRomSm);
-    //serial.ignoreFlowControl();
+    // serial.ignoreFlowControl();
 #if USE_ETHERNET
     networkInit();
 #endif
@@ -219,20 +215,15 @@ int main()
 {
     vreg_set_voltage(VREG_VOLTAGE_1_30);
     set_sys_clock_pll(PICO_CLOCK_PLL, PICO_CLOCK_PLL_DIV1, PICO_CLOCK_PLL_DIV2); // 252000
-    //set_sys_clock_khz(290000, false);
+    // set_sys_clock_khz(290000, false);
     stdio_init_all();
-    //stdio_set_translate_crlf(&stdio_usb, false);
+    // stdio_set_translate_crlf(&stdio_usb, false);
 
-   multicore_launch_core1(main1);
-   setup();
-    //__USBStart();
-
-    //while (true) ;
-    //setup();
+    multicore_launch_core1(main1);
+    setup();
     while (true)
     {
         tight_loop_contents();
         loop();
-        //_loop();
     }
 }

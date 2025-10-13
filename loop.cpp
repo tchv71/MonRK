@@ -1,5 +1,5 @@
 #include "hardware/pio.h"
-//#include "Serial.h"
+// #include "Serial.h"
 #include "gpios.h"
 #include "fifo.pio.h"
 #include "common.h"
@@ -24,10 +24,6 @@ extern "C"
 #include "pico/sync.h"
 
 const uint8_t RXEMPTY = 1; // MASK FOR RX BUFFER EMPTY
-//const uint8_t TXFULL = 2;  // MASK FOR TX BUFFER FULL
-
-//volatile uint8_t nextValue = 0;           /* pico read-ahead value */
-//volatile uint8_t currentStatus = RXEMPTY; /* current status register value */
 
 static uint8_t streamInBuf[10 * 1024];
 static uint8_t *pStreamInBufEnd;
@@ -47,13 +43,11 @@ static __force_inline bool updateFifoReadAhead()
 {
     if (pStreamInBufPtr == pStreamInBufEnd || pio_sm_is_tx_fifo_full(FIFO_PIO, fifoReadSm))
         return false;
-    
-    uint32_t readAhead = *pStreamInBufPtr++; //nextValue;
+
+    uint32_t readAhead = *pStreamInBufPtr++; // nextValue;
     if (pStreamInBufPtr == streamInBuf + sizeof(streamInBuf))
         pStreamInBufPtr = streamInBuf; // Wrap around
-    //readAhead |= currentStatus << 8;
-    //readAhead |= 0xFF << 8; // pin direction
-    // Put just output byte
+    //  Put just output byte
     pio_sm_put(FIFO_PIO, fifoReadSm, readAhead);
     return true;
 }
@@ -63,7 +57,7 @@ static __force_inline bool updateFifoReadAhead()
  */
 void __not_in_flash_func(pio_irq_handler_write)()
 {
-    uint32_t writeVal =  DMA_PIO->rxf[fifoWrite2Sm];
+    uint32_t writeVal = DMA_PIO->rxf[fifoWrite2Sm];
 
     if ((writeVal & (GPIO_A0_MASK >> PIN_CD7)) == 0) // write val
     {
@@ -75,12 +69,8 @@ void __not_in_flash_func(pio_irq_handler_write)()
         if (pos == outLength)
         {
             bFlushOutBuffer = true;
-            // currentStatus |= RXEMPTY;
         }
     }
-    // if (pStreamOutBufPtr == streamOutBuf + sizeof(streamOutBuf))
-    //     currentStatus |= TXFULL;
-    //updateFifoReadAhead();
 }
 
 extern "C" const uint dmaRomSm;
@@ -96,7 +86,7 @@ void __not_in_flash_func(pio_irq_handler_rom)()
     uint32_t val = pio_sm_get_blocking(FIFO_PIO, dmaRomSm); // FIFO_PIO->rxf[dmaRomSm];
 
     uint8_t w_addr = (val & 3);
-    uint8_t v_val = (val & (GPIO_CD_MASK << 4 )) >> (PIN_CD7+4);
+    uint8_t v_val = (val & (GPIO_CD_MASK << 4)) >> (PIN_CD7 + 4);
     switch (w_addr)
     {
     case 1:
@@ -113,7 +103,7 @@ void __not_in_flash_func(pio_irq_handler_rom)()
         break;
     }
     v55_buf[w_addr] = v_val;
-#if 1 
+#if 1
     if (addr == 0x44)
     {
         lastAddr = 0x44;
@@ -187,7 +177,7 @@ void fifoPioInit()
     for (uint i = 0; i < 8; ++i)
     {
         pio_gpio_init(FIFO_PIO, PIN_CD7 + i);
-        gpio_set_drive_strength( PIN_CD7 + i, GPIO_DRIVE_STRENGTH_12MA);
+        gpio_set_drive_strength(PIN_CD7 + i, GPIO_DRIVE_STRENGTH_12MA);
     }
     pio_gpio_init(FIFO_PIO, PIN_DIR);
     pio_sm_set_pins_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
@@ -211,7 +201,7 @@ void fifoPioInit()
     // irq_set_exclusive_handler(PIO0_IRQ_0, pio_irq_handler_read);
     // irq_set_enabled(PIO0_IRQ_0, true);
     pio_sm_set_enabled(FIFO_PIO, fifoReadSm, true);
-    //updateFifoReadAhead();
+    // updateFifoReadAhead();
 
     /* fifoWriteProg */
     pio_sm_claim(DMA_PIO, fifoWrite2Sm);
@@ -249,13 +239,13 @@ static void set_clock_khz(void)
 }
 /* Network */
 static wiz_NetInfo g_net_info =
-{
-    .mac = {0x00, 0x08, 0xDC, 0x12, 0x34, 0x56}, // MAC address
-    .ip = {192, 168, 31, 250},                   // IP address
-    .sn = {255, 255, 255, 0},                    // Subnet Mask
-    .gw = {192, 168, 31, 1},                     // Gateway
-    .dns = {192, 168, 31, 1},                    // DNS server
-    .dhcp = NETINFO_STATIC                       // DHCP enable/disable
+    {
+        .mac = {0x00, 0x08, 0xDC, 0x12, 0x34, 0x56}, // MAC address
+        .ip = {192, 168, 31, 250},                   // IP address
+        .sn = {255, 255, 255, 0},                    // Subnet Mask
+        .gw = {192, 168, 31, 1},                     // Gateway
+        .dns = {192, 168, 31, 1},                    // DNS server
+        .dhcp = NETINFO_STATIC                       // DHCP enable/disable
 };
 
 uint8_t s = 0;
@@ -270,8 +260,7 @@ const uint16_t SOCKET_PORT = 1243;
 #define RECV_TIMEOUT (1000 * 10) // 10 seconds
 
 /* Timezone */
-#define TIMEZONE 29 //40 // Korea
-
+#define TIMEZONE 29 // 40 // Korea
 
 /* SNTP */
 static uint8_t g_sntp_buf[ETHERNET_BUF_MAX_SIZE] = {
@@ -293,7 +282,6 @@ static time_t millis(void)
     return g_msec_cnt;
 }
 
-
 /* FTP */
 static uint8_t g_ftp_buf[ETHERNET_BUF_MAX_SIZE] = {
     0,
@@ -304,14 +292,14 @@ static uint8_t g_ftp_buf_cpm[ETHERNET_BUF_MAX_SIZE] = {
 
 extern "C"
 {
-uint8_t Calendar_GetDayWeek (RTC_DateTypeDef thisDate);
-void toRTC_Date(const  datetime_t * t, RTC_DateTypeDef *rt);
+    uint8_t Calendar_GetDayWeek(RTC_DateTypeDef thisDate);
+    void toRTC_Date(const datetime_t *t, RTC_DateTypeDef *rt);
 }
 void networkInit()
 {
-    //set_clock_khz();
+    // set_clock_khz();
 
-    //stdio_init_all();
+    // stdio_init_all();
     multicore_fifo_drain();
 
     wizchip_spi_initialize();
@@ -346,13 +334,13 @@ void networkInit()
 
     if (retval != 1)
     {
-        //printf(" SNTP failed : %d\n", retval);
+        // printf(" SNTP failed : %d\n", retval);
 
         while (1)
             ;
     }
 
-    //printf(" %d-%d-%d, %d:%d:%d\n", time.yy, time.mo, time.dd, time.hh, time.mm, time.ss);
+    // printf(" %d-%d-%d, %d:%d:%d\n", time.yy, time.mo, time.dd, time.hh, time.mm, time.ss);
 
     datetime_t t;
     t.day = time.dd;
@@ -364,16 +352,15 @@ void networkInit()
     RTC_DateTypeDef sDate;
     toRTC_Date(&t, &sDate);
     t.dotw = Calendar_GetDayWeek(sDate);
-     // Start the RTC
+    // Start the RTC
     rtc_init();
     rtc_set_datetime(&t);
 
     ftpd_init(g_net_info.ip);
     ftpd_cpm_init(g_net_info.ip);
-    
 
     /* Get network information */
-    //print_network_information(g_net_info);
+    // print_network_information(g_net_info);
     multicore_fifo_pop_blocking();
 }
 
@@ -427,22 +414,23 @@ public:
 
 void __not_in_flash_func(loop)()
 {
-    while (updateFifoReadAhead()) ;
+    while (updateFifoReadAhead())
+        ;
 #if USE_ETHERNET
     uint8_t retval;
     // mutex_enter_blocking(get_sd_mutex());
     /* Run FTP server */
     if ((retval = ftpd_run(g_ftp_buf)) < 0)
     {
-        //printf(" FTP server error : %d\n", retval);
+        // printf(" FTP server error : %d\n", retval);
 
         while (1)
             ;
     }
-    //mutex_exit(get_sd_mutex());
+    // mutex_exit(get_sd_mutex());
     if ((retval = ftpd_cpm_run(g_ftp_buf_cpm)) < 0)
     {
-        //printf(" FTP server error : %d\n", retval);
+        // printf(" FTP server error : %d\n", retval);
 
         while (1)
             ;
@@ -492,24 +480,22 @@ void __not_in_flash_func(loop)()
         case SOCK_CLOSE_WAIT:
             disconnect(s);
             bSockEstablished = false;
-			break;
+            break;
 
-		case SOCK_CLOSED:
+        case SOCK_CLOSED:
             socket(s, Sn_MR_TCP, SOCKET_PORT, 0);
-			break;
+            break;
 
-		case SOCK_INIT:
-			listen(s);
-			break;
+        case SOCK_INIT:
+            listen(s);
+            break;
 
-		case SOCK_LISTEN:
-			break;
+        case SOCK_LISTEN:
+            break;
 
-		default :
-			break;
-        
+        default:
+            break;
         }
-
     }
 #endif
 #if USE_SERIAL_DEBUG
@@ -521,19 +507,14 @@ void __not_in_flash_func(loop)()
         {
             *pStreamInBufEnd++ = serial.read();
         }
-        //uint32_t ints = save_and_disable_interrupts();
-        // if (currentStatus & RXEMPTY)
-        //     pio_sm_clear_fifos(FIFO_PIO, fifoReadSm);
-        //nextValue = *pStreamInBufPtr++;
-        //currentStatus &= ~RXEMPTY;
+        // uint32_t ints = save_and_disable_interrupts();
         outLength = 0xFF;
-        //restore_interrupts_from_disabled(ints);
-        updateFifoReadAhead();
+        // restore_interrupts_from_disabled(ints);
+        //updateFifoReadAhead();
     }
 
     if ((pStreamOutBufPtr == streamOutBuf + sizeof(streamOutBuf) || (bFlushOutBuffer && pStreamOutBufPtr != streamOutBuf)) /* && serial.availableForWrite() */)
     {
-        //currentStatus |= TXFULL /*  | RXEMPTY */;
         uint16_t len;
         if (!bSockEstablished)
         {
@@ -541,19 +522,19 @@ void __not_in_flash_func(loop)()
             serial.flush();
         }
 #if USE_ETHERNET
-        else if (bSockEstablished && (len = getSn_TX_FSR(s))>0)
+        else if (bSockEstablished && (len = getSn_TX_FSR(s)) > 0)
         {
             uint16_t size = pStreamOutBufPtr - streamOutBuf;
             if (len > size)
-              len = size;
+                len = size;
             send(s, streamOutBuf, len);
         }
-        else return;
+        else
+            return;
 #endif
         pStreamOutBufPtr = streamOutBuf;
-        //currentStatus &= ~TXFULL;
-        bFlushOutBuffer = false;
-        //updateFifoReadAhead();
+         bFlushOutBuffer = false;
+        // updateFifoReadAhead();
     }
 #endif
 }

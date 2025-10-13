@@ -190,7 +190,7 @@ void cmd_ver()
 void cmd_boot_exec()
 {
   // Файл по умолчанию
-#ifndef USE_DMA
+#if !USE_DMA
     const char *bootSdbiosRk = "boot/sdbios.rk";
 #else
     const char *bootSdbiosRk = "boot/sdbiosd.rkl";
