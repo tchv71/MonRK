@@ -34,14 +34,14 @@ BYTE sd_sdhc; /* Используется SDHC карта */
 
 static void SD_CS_ENABLE()
 {
-  gpio_put(SPI_CSn, 0);
+  gpio_put(PIN_SPI_CSn, 0);
   uint8_t fill = SPI_FILL_CHAR;
   spi_write_blocking(_SPI, &fill, 1);
 }
 
 static void SD_CS_DISABLE()
 {
-  gpio_put(SPI_CSn, 1);
+  gpio_put(PIN_SPI_CSn, 1);
   uint8_t fill = SPI_FILL_CHAR;
   spi_write_blocking(_SPI, &fill, 1);
 }

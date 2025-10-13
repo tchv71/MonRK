@@ -18,13 +18,22 @@
 #define PIN_nIOW  6
 #define PIN_nIOR  7
 #define PIN_DIR   8
-#define PIN_LED   3
+#define PIN_LED   25
 
-#define PIN_A0 0
-#define PIN_A1 1
-#define PIN_nCS2 2
+#define PIN_A0 28
+#define PIN_A1 29
+#define PIN_nCS2 23
 #define PIN_nWR PIN_nIOW
 #define PIN_nRD PIN_nIOR
+
+enum
+{
+    PIN_SPI_RX  = 12,
+    PIN_SPI_CSn = 13,
+    PIN_SPI_SCK = 10,
+    PIN_SPI_TX  = 11
+}; 
+
 
 #define A0_MASK   (1 << PIN_A0)
 #define A1_MASK   (1 << PIN_A1)

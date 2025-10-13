@@ -3,31 +3,44 @@
 
 #include "proto.h"
 #include "pico/time.h"
+#include "hardware/pio.h"
 
-#ifndef USE_DMA
-void wait()
-{
-    // Ждем перепад 0->1
-    while(!PINC.5);
-    while(PINC.5); 
-    if((PINC&0x3F)==0) return;
-#asm 
-    RJMP 0
-#endasm
+void RkSd_Main();
 
-}
-#endif
-#ifdef USE_DMA
+extern const uint dmaRomSm;
+
+
+#if !USE_DMA
 enum DMA_MODE { DM_NONE = 0, DM_SEND, DM_RECEIVE} dm_mode;
 BYTE cmd_buf_send[32];
 BYTE cmd_buf_recv[32];
 BYTE* cmd_buf_send_ptr = cmd_buf_send;
 BYTE* cmd_buf_recv_ptr = cmd_buf_recv;
+
+void DATA_BUS_OUT()
+{}
+
+void DATA_BUS_IN()
+{}
+
+void WRITE_DATA(uint8_t val)
+{
+  v55_buf[0] = val;
+  pio_sm_put(FIFO_PIO, dmaRomSm, 0xFF << 8 | val);
+}
+
+uint8_t READ_DATA()
+{
+  return v55_buf[0];
+}
+
 #endif
+
+void wait();
 
 void sendStart(BYTE c)
 {
-#ifndef USE_DMA
+#if !USE_DMA
   wait ();
   DATA_BUS_OUT();
   WRITE_DATA(c);
@@ -38,7 +51,7 @@ void sendStart(BYTE c)
 #endif
 }
 
-#ifdef USE_DMA
+#if !USE_DMA
 void recvStartNoDma()
 {
   if (dm_mode == DM_SEND && cmd_buf_send_ptr != cmd_buf_send)
@@ -52,7 +65,7 @@ WORD l;
 
 void recvStart()
 {
-#ifndef USE_DMA
+#if !USE_DMA
   wait ();
   DATA_BUS_IN ();
 #else
@@ -64,7 +77,7 @@ void recvStart()
 
 BYTE wrecv()
 {
-#ifndef USE_DMA
+#if !USE_DMA
   wait ();
   return READ_DATA();
 #else
@@ -74,14 +87,14 @@ BYTE wrecv()
 
 void sendByte(BYTE c)
 {
-#ifndef USE_DMA
+#if !USE_DMA
   wait ();
   WRITE_DATA(c);
 #else
   *cmd_buf_send_ptr++=c;
 #endif
 }
-#ifdef USE_DMA
+#if !USE_DMA
 WORD lSend;
 void sendFlush()
 {

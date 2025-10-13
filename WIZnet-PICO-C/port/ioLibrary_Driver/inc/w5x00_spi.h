@@ -28,12 +28,12 @@
 
 #else
 /* SPI */
-#define SPI_PORT spi1
+#define SPI_PORT spi0
 
-#define PIN_SCK  10
-#define PIN_MOSI 11
-#define PIN_MISO 12
-#define PIN_CS   3
+#define PIN_SCK  2//10
+#define PIN_MOSI 3//11
+#define PIN_MISO 0//12
+#define PIN_CS   1
 #define PIN_RST  9//2
 #define PIN_IRQ  22//3
 

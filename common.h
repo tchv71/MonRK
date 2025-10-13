@@ -11,17 +11,9 @@
 #include <pico/sync.h>
 
 #define CONST
-#define USE_DMA 1
+#define USE_DMA 0
 #define USE_ETHERNET 1
 #define USE_SERIAL_DEBUG 1
-
-enum
-{
-    SPI_RX  = 12,
-    SPI_CSn = 13,
-    SPI_SCK = 10,
-    SPI_TX  = 11
-}; 
 
 typedef uint8_t   BYTE;
 typedef uint16_t  WORD;
@@ -31,6 +23,7 @@ typedef uint32_t  DWORD;
 extern "C" {
 #endif
 mutex_t* get_sd_mutex();
+extern uint8_t v55_buf[4];
 #ifdef __cplusplus
 }
 #endif

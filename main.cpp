@@ -74,11 +74,13 @@ static struct _reent *_impure_ptr1 = nullptr;
 extern "C" void main_sd();
 
 extern "C" const uint dmaWriteSm;
+extern "C" const uint dmaRomSm;
 extern const uint dmaReadSm;
 extern "C" const uint fifoWrite2Sm;
 
 
 extern void __not_in_flash_func(pio_irq_handler_write)();
+extern void __not_in_flash_func(pio_irq_handler_rom)();
 
 
 /*
@@ -90,25 +92,35 @@ void dmaPioInit()
 {
     // DMA Read  = SD  -> Mem
     // DMA Write = Mem -> SD
-    uint dmaWriteProgram = pio_add_program(DMA_PIO, &dmaWrite_program);
+    int romProgramOffset = pio_add_program(FIFO_PIO, &rom_program);
+    if (romProgramOffset < 0)
+        panic("Failed add fifoReadProgram");
+    pio_sm_clear_fifos(FIFO_PIO, dmaRomSm);
 
-    pio_sm_config writeConfig = dmaWrite_program_get_default_config(dmaWriteProgram);
-    sm_config_set_jmp_pin(&writeConfig, PIN_nDACK);
-    sm_config_set_in_pins(&writeConfig, PIN_CD7);
-    sm_config_set_in_shift(&writeConfig, false, true, 16); // L shift, autopush @ 16 bits
-    sm_config_set_clkdiv(&writeConfig, 1.0f);
+    pio_sm_config romConfig = rom_program_get_default_config(romProgramOffset);
+    sm_config_set_in_pins(&romConfig, PIN_A0);
+    sm_config_set_jmp_pin(&romConfig, PIN_nWR);
+    sm_config_set_sideset_pin_base(&romConfig, PIN_DIR);
+    sm_config_set_out_pins(&romConfig, PIN_CD7, 8);
+#define SH_LEFT false
+#define SH_RIGHT true
+    sm_config_set_in_shift(&romConfig, SH_LEFT, false, 32); // L shift
+    sm_config_set_out_shift(&romConfig, SH_RIGHT, false, 32); // R shift
+    sm_config_set_clkdiv(&romConfig, 1.0f);
 
-    pio_sm_init(DMA_PIO, dmaWriteSm, dmaWriteProgram, &writeConfig);
-    pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true/* false */);
+    pio_sm_init(FIFO_PIO, dmaRomSm, romProgramOffset, &romConfig);
+    pio_set_irq1_source_enabled(FIFO_PIO, pis_sm1_rx_fifo_not_empty, true);
+    irq_set_exclusive_handler(PIO0_IRQ_1, pio_irq_handler_rom);
+    irq_set_enabled(PIO0_IRQ_1, true);
+    pio_sm_set_enabled(FIFO_PIO, dmaRomSm, true/* false */);
 
-
-#if 1
+#if 0
     int dmaReadProgOffset = pio_add_program(FIFO_PIO, &dmaRead_program);
     if (dmaReadProgOffset<0)
         panic("Failed add dmaReadProgram");
 
     pio_sm_config readDmaConfig = dmaRead_program_get_default_config(dmaReadProgOffset);
-    //sm_config_set_in_pins(&readDmaConfig, GPIO_CSR);
+    //sm_config_set_in_pins(&readDmaConfig, PIN_CSR);
     sm_config_set_jmp_pin(&readDmaConfig, PIN_nDACK);
     sm_config_set_sideset_pin_base(&readDmaConfig, PIN_DIR);
     sm_config_set_out_pins(&readDmaConfig, PIN_CD7, 8);
@@ -125,48 +137,53 @@ void setup1()
 {    
     spi_init (_SPI, BAUD);
     spi_set_format(_SPI, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
-    gpio_set_function(SPI_RX, GPIO_FUNC_SPI);
-    //gpio_set_function(SPI_CSn, GPIO_FUNC_SPI);
-    gpio_set_function(SPI_SCK, GPIO_FUNC_SPI);
-    gpio_set_function(SPI_TX, GPIO_FUNC_SPI);
+    gpio_set_function(PIN_SPI_RX, GPIO_FUNC_SPI);
+    //gpio_set_function(PIN_SPI_CSn, GPIO_FUNC_SPI);
+    gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI);
+    gpio_set_function(PIN_SPI_TX, GPIO_FUNC_SPI);
 
-    gpio_init (SPI_CSn);
-    gpio_put (SPI_CSn, 1);
-    gpio_set_dir (SPI_CSn, GPIO_OUT);
+    gpio_init_mask(A0_MASK | A1_MASK | nCS2_MASK | /* GPIO_CD_MASK |  */nWR_MASK | nRD_MASK);
+
+    gpio_init (PIN_SPI_CSn);
+    gpio_put (PIN_SPI_CSn, 1);
+    gpio_set_dir (PIN_SPI_CSn, GPIO_OUT);
  
     gpio_init (PIN_DRQ);
     gpio_put (PIN_DRQ, 0);
     gpio_set_dir (PIN_DRQ, GPIO_OUT);
 
-    gpio_init(25);
-    gpio_set_dir(25, GPIO_OUT);
-    gpio_put(25, 0);
+    gpio_init(PIN_nDACK);
+    gpio_set_dir(PIN_nDACK, GPIO_IN);
+
+    gpio_init(PIN_nIOR);
+    gpio_set_dir(PIN_nIOR, GPIO_IN);
+
+    gpio_init(PIN_nIOW);
+    gpio_set_dir(PIN_nIOW, GPIO_IN);
+
+    gpio_init(PIN_LED);
+    gpio_set_dir(PIN_LED, GPIO_OUT);
+    gpio_put(PIN_LED, 0);
 
     // SD cards' DO MUST be pulled up.
-    gpio_pull_up(SPI_RX);
+    gpio_pull_up(PIN_SPI_RX);
 
     dmaPioInit();
-    main_sd(); 
 }
 
 void loop1()
 {
-
+    main_sd(); 
 }
 
 void main1()
 {
-    // rp2040.fifo.registerCore();
     if (setup1)
-    {
         setup1();
-    }
     while (true)
     {
         if (loop1)
-        {
             loop1();
-        }
     }
 }
 
@@ -178,8 +195,16 @@ extern void networkInit();
 
 void setup()
 {
-    gpio_init_mask(/* GPIO_CD_MASK | */ GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
+    gpio_init_mask(GPIO_CD_MASK | GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
+    gpio_set_dir_in_masked(GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
+    gpio_init (PIN_DIR);
+    gpio_put (PIN_DIR, 0);
+    gpio_set_dir (PIN_DIR, GPIO_OUT);
+    gpio_set_drive_strength(PIN_DIR, GPIO_DRIVE_STRENGTH_12MA);
+    gpio_pull_up(PIN_CD7);
+
     fifoPioInit();
+    pio_sm_claim(FIFO_PIO, dmaRomSm);
     //serial.ignoreFlowControl();
 #if USE_ETHERNET
     networkInit();

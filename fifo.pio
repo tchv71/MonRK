@@ -1,11 +1,11 @@
 /*
- * Project: pico9918
+ * Project: monRk
  *
- * Copyright (c) 2024 Troy Schrapel
+ * Copyright (c) 2024 Troy Schrapel, (c) 2025 Dmitry Tsvetkov
  *
  * This code is licensed under the MIT license
  *
- * https://github.com/visrealm/pico9918
+ * https://github.com/tchv71/MonRK
  *
  */
 
@@ -29,39 +29,57 @@
 .program fifoRead
 .define public CSR_PIN 26
 .side_set 1 opt
-
-  pull block
-  mov x, osr        ; ensure we have a valid fifio value in x
-
 .wrap_target
 start:
   mov osr, null       ; change CD0-7 pindirs to inputs
   out pindirs, 8 side 1
 
-pullLoop:
-  pull noblock        ; continuously empty the tx fifo
-  mov x, osr        ; since we want the latest value
-
-  mov isr, null
-  in pins, 1        ; hacky way to jmp based on the CSR pin
-  mov y, isr        ; since we can only have one jmp pin
-  jmp y--, pullLoop ; still 1? loop, otherwise, let's read
-
-  ;wait 0 gpio CSR_PIN ; wait for CSR to go low (active)
-
-  jmp pin readStatus; if 'mode' is high, read status bits
+  wait 0 gpio CSR_PIN ; wait for CSR to go low (active)
+  jmp pin readStatus  ; if PIN_A0_28 'mode' is high, read status bits 
 readData:
-  out pins, 8       ; mode is low, send the data byte
-  out null, 8
+  ;mov x, null
+  set x,0x15
+  pull noblock
+  out pins, 8         ; mode is low, send the data byte
   jmp endPart
-readStatus:  
-  out null, 8       ; skip data bits
-  out pins, 8       ; output the status byte
+readStatus:
+  mov x, STATUS
+  jmp !x, l02
+  set x, 1
+l02:
+  mov osr, x
+  out pins, 8       ; output the status byte (1 - is busy)
 endPart:
+  mov osr, !null
   out pindirs, 8 side 0   ; set up CD0-7 as outputs
-  in pins, 3        ; push CSR, CSW and MODE back through fifo
-  push noblock      ; push ^^^ back to cpu to process
   wait 1 gpio CSR_PIN ; wait for CSR to go high (inactive) 
+.wrap
+
+.program rom
+.define public PIN_nCS2 23
+.define public PIN_nWR 6
+.side_set 1 opt
+
+.wrap_target
+start3:
+  mov osr, null       ; change CD0-7 pindirs to inputs
+  out pindirs, 8 side 1
+
+  wait 0 gpio PIN_nCS2
+  jmp pin romRead
+  wait 1 gpio PIN_nWR
+  mov isr, null
+  in pins 26;14+8
+  push noblock
+  ;wait 1 gpio PIN_nCS2
+  jmp s1
+romRead:
+  pull noblock
+  mov x, osr        ; ensure we have a valid fifo value in x
+  out pins, 8       ; send the data byte
+  out pindirs, 8 side 0   ; set up CD0-7 as outputs
+s1:
+  wait 1 gpio PIN_nCS2
 .wrap
 
 .program dmaRead
@@ -73,8 +91,8 @@ endPart:
   out pindirs, 8 side 1
   pull block
 pullLoop2:
-  jmp pin, pullLoop2 ; nDACK_PIN
-  ;wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
+  ;jmp pin, pullLoop2 ; nDACK_PIN
+  wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
   wait 0 gpio nIOR_PIN  ; wait for nIOR to go active (low)
   out pins, 8           ; send the data byte
   out pindirs, 8 side 0 ; set up CD0-7 as outputs

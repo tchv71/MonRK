@@ -825,14 +825,9 @@ BYTE RkSd_Loop()
   }
 }
 
-#ifdef USE_DMA
-
-static inline void WRITE_DATA(BYTE c)
-{
-  gpio_put_masked(GPIO_CD_MASK, ((uint32_t)c) << PIN_CD7);
-}
 //const uint dmaReadSm = 0;
 const uint dmaWriteSm = 0;
+const uint dmaRomSm = 1;
 const uint dmaReadSm = 1;
 const uint fifoReadSm = 0;
 const uint fifoWrite2Sm = 1;
@@ -840,19 +835,7 @@ extern int res;
 //extern const uint fifoWriteSm;
 extern const uint fifoReadSm;
 #define INTS_OFF 0
-
-void __not_in_flash_func(dma_send64)(BYTE *ptr, WORD* pLen);
-
 void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
-{
-  do
-  {
-    dma_send64(ptr, &len);
-    ptr += 32;
-  } while (len);
-}
-
-void __not_in_flash_func(dma_send64)(BYTE *ptr, WORD* pLen)
 {
 #if 1
   gpio_init(PIN_DRQ);
@@ -862,11 +845,10 @@ void __not_in_flash_func(dma_send64)(BYTE *ptr, WORD* pLen)
 #if INTS_OFF
   uint32_t ints = save_and_disable_interrupts();
 #endif
-  uint32_t loopCnt = 32;
   do
   {
-    pio_sm_put_blocking(FIFO_PIO, dmaReadSm, (*ptr++) | (0xFF << 8));
-  } while (--(*pLen) && --loopCnt);
+    pio_sm_put_blocking(FIFO_PIO, dmaReadSm, *ptr++ | (0xFF << 8));
+  } while (--len);
 #if INTS_OFF
   restore_interrupts(ints);
 #endif
@@ -874,28 +856,23 @@ void __not_in_flash_func(dma_send64)(BYTE *ptr, WORD* pLen)
   while (gpio_get(PIN_nDACK) != 0) ;
   gpio_put(PIN_DRQ, 0);
 #else
-  gpio_init(DRQ);
-  gpio_put(DRQ, 1);
-  gpio_set_dir(DRQ, GPIO_OUT);
+  gpio_init(PIN_DRQ);
+  gpio_put(PIN_DRQ, 1);
+  gpio_set_dir(PIN_DRQ, GPIO_OUT);
   uint32_t ints = save_and_disable_interrupts();
   do
   {
     DATA_IN();
-    while (gpio_get_all() & (nIOR_MASK/*  | nDACK_MASK */))
+    while (gpio_get_all() & (nIOR_MASK | nDACK_MASK))
       ;
     DATA_OUT();
     WRITE_DATA(*ptr++); // PORTD = *ptr++;
     while (gpio_get(nIOR) == 0)
       ;
   } while (--len);
-  gpio_put(DRQ, 0);
+  gpio_put(PIN_DRQ, 0);
   restore_interrupts(ints);
 #endif
-}
-
-static inline BYTE READ_DATA()
-{
-  return (gpio_get_all() & GPIO_CD_MASK) >> PIN_CD7;
 }
 
 void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
@@ -918,7 +895,7 @@ void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
   gpio_put(PIN_DRQ, 0);
   #else
   DATA_IN();
-  gpio_put(DRQ, 1);
+  gpio_put(PIN_DRQ, 1);
   uint32_t ints = save_and_disable_interrupts();
   do
   {
@@ -932,12 +909,144 @@ void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
   restore_interrupts(ints);
 #endif
 }
+#if USE_DMA
+
+static inline void WRITE_DATA(BYTE c)
+{
+  gpio_put_masked(GPIO_CD_MASK, ((uint32_t)c) << PIN_CD7);
+}
+
+static inline BYTE READ_DATA()
+{
+  return (gpio_get_all() & GPIO_CD_MASK) >> PIN_CD7;
+}
+
+#else // !USE_DMA
+static inline void WRITE_DATA(BYTE c)
+{
+  uint32_t val;
+  do
+  {
+    val = gpio_get_all();
+  }
+  while ((val & (nCS2_MASK | nRD_MASK))!=0);   
+  gpio_set_dir_out_masked(GPIO_CD_MASK);
+  gpio_put_masked(GPIO_CD_MASK, ((uint32_t)c) << PIN_CD7);
+  do
+  {
+    val = gpio_get_all();
+  }
+  while ((val & (nCS2_MASK | nRD_MASK))==0);   
+  gpio_set_dir_in_masked(GPIO_CD_MASK);
+}
+
+uint8_t v55_buf[4] = {0,0,0,0};
+
+static __force_inline uint16_t __not_in_flash_func(READ_ADDR)()
+{
+  return *(uint16_t*)&v55_buf[1];// | (((uint32_t)v55_buf[2]) << 8);
+}
+
+bool bDir = false;
+
+static __force_inline void __not_in_flash_func(WAIT_RW_BYTE)()
+{
+  uint32_t val;
+  do
+  {
+    val = gpio_get_all();
+  } while ((val & nCS2_MASK) !=0/*  || (val & (nWR_MASK | nRD_MASK)) == (nWR_MASK | nRD_MASK) */);
+  uint8_t addr = (val & (A0_MASK | A1_MASK)) >> PIN_A0;
+  if ((val & nRD_MASK) == 0)
+  {
+    //gpio_put_masked(GPIO_CD_MASK, ((uint32_t)v55_buf[addr]) << PIN_CD7);
+    //gpio_set_dir_out_masked(GPIO_CD_MASK);
+    pio_sm_set_pins_with_mask(FIFO_PIO, fifoReadSm, ((uint32_t)v55_buf[addr]) << PIN_CD7, GPIO_CD_MASK);
+    //pio_sm_set_pindirs_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
+    pio_sm_set_consecutive_pindirs(FIFO_PIO, fifoReadSm, PIN_CD7, 8, true);
+    gpio_put(PIN_DIR, bDir = !bDir);
+    //gpio_put_masked(GPIO_CD_MASK, ((uint32_t)v) << PIN_CD7);
+    do
+    {
+      val = gpio_get_all();
+    } while ((val & (nCS2_MASK/*  | nRD_MASK */)) == 0);
+    // gpio_put_masked(GPIO_CD_MASK, ((uint32_t)v) << PIN_CD7);
+    // gpio_put_masked(GPIO_CD_MASK, ((uint32_t)v) << PIN_CD7);
+    //gpio_set_dir_in_masked(GPIO_CD_MASK);
+    pio_sm_set_consecutive_pindirs(FIFO_PIO, fifoReadSm, PIN_CD7, 8, false);
+    gpio_put(PIN_DIR, bDir = !bDir);
+  }
+  else
+  {
+    do
+    {
+      val = gpio_get_all();
+    } while ((val & (nCS2_MASK | nWR_MASK)) == 0);
+    uint8_t v = (val & GPIO_CD_MASK) >> PIN_CD7;
+    v55_buf[addr] = v;
+  }
+}
+
 #endif
 
+//void RkSd_main();
+
+void __not_in_flash_func(wait)()
+{
+#if !USE_DMA
+  // Ждем перепад 1->0 A5
+  while ((v55_buf[1] & 0x20) == 0)
+    WAIT_RW_BYTE();
+  while ((v55_buf[1] & 0x20) != 0)
+    WAIT_RW_BYTE();
+  uint32_t addr = READ_ADDR ();
+  if ((addr & 0x3f) == 0)
+    return;
+  //RkSd_main ();
+#endif
+}
 auto_init_mutex(sd_mutex);
 mutex_t* get_sd_mutex()
 {
   return &sd_mutex;
+}
+
+extern volatile uint16_t addr;
+extern volatile bool bStopRomEmu;
+
+void __not_in_flash_func(EmulateRom)()
+{
+#if 0
+  BYTE lastAddr = 0;
+  //uint32_t ints = save_and_disable_interrupts();
+  disable_interrupts();
+  memset(v55_buf, 0, sizeof(v55_buf));
+  while (1)
+  {
+    WAIT_RW_BYTE();
+    uint16_t addr = READ_ADDR();
+    v55_buf[0] = rom[addr & 0x7f];
+    if (addr == 0x44)
+    {
+      lastAddr = 0x44;
+    }
+    else if (addr == 0x40)
+    {
+      lastAddr = (lastAddr == 0x44) ? 0x40 : 0;
+    }
+    else if (addr == 0)
+    {
+      if (lastAddr == 0x40)
+        break;
+      else
+        lastAddr = 0;
+    }
+  }
+  //restore_interrupts(ints);
+  enable_interrupts();
+#else
+  while (!bStopRomEmu) ;
+#endif
 }
 
 
@@ -973,7 +1082,7 @@ void main_sd()
 
       // Гасим светодиод
       LedOff();
-#if 1
+#if 0
     //sendStart(0x45);
     //sendFlush();
 #if 0
@@ -993,6 +1102,9 @@ void main_sd()
     mutex_exit(&sd_mutex);
   }
   //while (true) ;
+#if !USE_DMA
+   EmulateRom();
+#endif
   while (1)
   {
     if (!RkSd_Loop())
