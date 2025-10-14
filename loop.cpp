@@ -25,12 +25,72 @@ extern "C"
 
 const uint8_t RXEMPTY = 1; // MASK FOR RX BUFFER EMPTY
 
-static uint8_t streamInBuf[10 * 1024];
-static uint8_t *pStreamInBufEnd;
-static uint8_t *pStreamInBufPtr;
+template <int size>
+class CircBuffer
+{
+public:
+    CircBuffer() : m_Ptr(m_Buf), m_End(m_Buf) {}
+    bool isEmpty() const { return m_Ptr == m_End; }
+    uint8_t getByte()
+    {
+        uint8_t c = *m_Ptr++;
+        if (m_Ptr == m_Buf + sizeof(m_Buf))
+            m_Ptr = m_Buf;
+        return c;
+    }
+    void clear()
+    {
+        m_Ptr = m_End = m_Buf;
+    }
+    void put(uint8_t c)
+    {
+        *m_End++ = c;
+        if (m_End == m_Buf + sizeof(m_Buf))
+            m_End = m_Buf;  
+    }
+    size_t getMaxSize() const { return sizeof(m_Buf); }
+    size_t getSize() const
+    {
+        ptrdiff_t diff = m_End - m_Ptr;
+        if (diff >= 0)
+            return diff;
+        return sizeof(m_Buf) + diff;
+    }
+    ptrdiff_t remains(int len) { return (m_Buf + sizeof(m_Buf)) - (m_End + len); }
+    uint8_t* getPtr() { return m_Ptr; }
+    uint8_t* getEndPtr() { return m_End; }
+    uint8_t* getStartPtr() { return m_Buf; }
+    void movePtr(uint8_t* &Ptr, size_t s)
+    {
+        Ptr += s;
+        const uint8_t* BufEnd = m_Buf + sizeof(m_Buf);
+        if (Ptr >= BufEnd)
+            Ptr = m_Buf + (Ptr - BufEnd);
+    }
+    void reserve(size_t s) { movePtr(m_End, s);}
+    void advance(size_t s) { movePtr(m_Ptr, s); }
+    void setEndToStart(size_t s) { m_End = m_Buf + s; }
+    void setCurToEnd() { m_Ptr = m_End; }
+    size_t curToEnd() const { return m_Buf + sizeof(m_Buf) - m_Ptr;}
+    size_t endToStart() const { return m_End - m_Buf; }
+protected:
+    uint8_t* m_Ptr;
+    uint8_t* m_End;
+    uint8_t m_Buf[size];
+};
 
-static uint8_t streamOutBuf[1024];
-static uint8_t *pStreamOutBufPtr;
+static CircBuffer<10*1024> bufIn;
+//static uint8_t streamInBuf[10 * 1024];
+//static uint8_t *pStreamInBufEnd;
+//static uint8_t *pStreamInBufPtr;
+
+
+
+static CircBuffer<1024> bufOut;
+//static uint8_t streamOutBuf[1024];
+//static uint8_t *pStreamOutBufPtr;
+
+
 
 static volatile bool bFlushOutBuffer = false;
 static volatile uint8_t outLength = 0xff;
@@ -41,13 +101,10 @@ extern "C" const uint fifoWrite2Sm;
  */
 static __force_inline bool updateFifoReadAhead()
 {
-    if (pStreamInBufPtr == pStreamInBufEnd || pio_sm_is_tx_fifo_full(FIFO_PIO, fifoReadSm))
+    if (bufIn.isEmpty() || pio_sm_is_tx_fifo_full(FIFO_PIO, fifoReadSm))
         return false;
 
-    uint32_t readAhead = *pStreamInBufPtr++; // nextValue;
-    if (pStreamInBufPtr == streamInBuf + sizeof(streamInBuf))
-        pStreamInBufPtr = streamInBuf; // Wrap around
-    //  Put just output byte
+    uint32_t readAhead = bufIn.getByte(); // nextValue;
     pio_sm_put(FIFO_PIO, fifoReadSm, readAhead);
     return true;
 }
@@ -62,8 +119,8 @@ void __not_in_flash_func(pio_irq_handler_write)()
     if ((writeVal & (GPIO_A0_MASK >> PIN_CD7)) == 0) // write val
     {
         uint8_t c = writeVal & 0xff;
-        *pStreamOutBufPtr++ = c;
-        uint8_t pos = pStreamOutBufPtr - streamOutBuf;
+        bufOut.put(c);
+        uint8_t pos = bufOut.getSize();
         if (pos == 2)
             outLength = c + 3;
         if (pos == outLength)
@@ -165,8 +222,8 @@ void __not_in_flash_func(pio_irq_handler_read)()
  */
 void fifoPioInit()
 {
-    pStreamInBufPtr = pStreamInBufEnd = streamInBuf;
-    pStreamOutBufPtr = streamOutBuf;
+    bufIn.clear();
+    bufOut.clear();
 
 #if USE_SERIAL_DEBUG
     pio_sm_claim(FIFO_PIO, fifoReadSm);
@@ -364,8 +421,9 @@ void networkInit()
     multicore_fifo_pop_blocking();
 }
 
-const uint16_t DATA_BUF_SIZE = sizeof(streamInBuf);
+//const uint16_t DATA_BUF_SIZE = sizeof(streamInBuf);
 bool bSockEstablished = false;
+bool bSerialEstablished = false;
 
 class SerialUSB
 {
@@ -452,19 +510,19 @@ void __not_in_flash_func(loop)()
             while ((len = getSn_RX_RSR(s)) > 0 /*  && pStreamInBufEnd == pStreamInBufPtr */)
             {
                 // pStreamInBufEnd = pStreamInBufPtr = streamInBuf;
-                if (len > DATA_BUF_SIZE)
-                    len = DATA_BUF_SIZE;
-                ptrdiff_t bufferRemains = (streamInBuf + sizeof(streamInBuf)) - (pStreamInBufEnd + len);
+                if (len > bufIn.getMaxSize())
+                    len = bufIn.getMaxSize();
+                ptrdiff_t bufferRemains = bufIn.remains(len);
                 if (bufferRemains >= 0)
                 {
-                    len = recv(s, pStreamInBufEnd, len);
-                    pStreamInBufEnd += len;
+                    len = recv(s, bufIn.getEndPtr(), len);
+                    bufIn.reserve(len);
                 }
                 else
                 {
-                    recv(s, pStreamInBufEnd, len + bufferRemains);
-                    recv(s, streamInBuf, -bufferRemains);
-                    pStreamInBufEnd = streamInBuf - bufferRemains;
+                    recv(s, bufIn.getEndPtr(), len + bufferRemains);
+                    recv(s, bufIn.getStartPtr(), -bufferRemains);
+                    bufIn.setEndToStart(-bufferRemains);
                 }
                 // uint32_t ints = save_and_disable_interrupts();
                 //  if (currentStatus & RXEMPTY)
@@ -501,11 +559,10 @@ void __not_in_flash_func(loop)()
 #if USE_SERIAL_DEBUG
     if (!bSockEstablished && serial.available() /* && ((currentStatus & TXFULL) == 0) */ /* && pStreamInBufPtr == pStreamInBufEnd */)
     {
-        if (pStreamInBufEnd == pStreamInBufPtr)
-            pStreamInBufEnd = pStreamInBufPtr = streamInBuf;
-        while (serial.available() && pStreamInBufEnd != streamInBuf + sizeof(streamInBuf))
+        bSerialEstablished = true;
+        while (serial.available())
         {
-            *pStreamInBufEnd++ = serial.read();
+            bufIn.put(serial.read());
         }
         // uint32_t ints = save_and_disable_interrupts();
         outLength = 0xFF;
@@ -513,28 +570,39 @@ void __not_in_flash_func(loop)()
         //updateFifoReadAhead();
     }
 
-    if ((pStreamOutBufPtr == streamOutBuf + sizeof(streamOutBuf) || (bFlushOutBuffer && pStreamOutBufPtr != streamOutBuf)) /* && serial.availableForWrite() */)
+    if (bFlushOutBuffer && bufOut.getSize()>0)
     {
         uint16_t len;
-        if (!bSockEstablished)
+        if (!bSockEstablished && !bSerialEstablished)
         {
-            serial.write(streamOutBuf, pStreamOutBufPtr - streamOutBuf);
+            bufOut.clear();
+        }
+        else if (!bSockEstablished)
+        {
+            serial.write(bufOut.getPtr(), bufOut.getSize());
             serial.flush();
+            bufOut.setCurToEnd();
         }
 #if USE_ETHERNET
         else if (bSockEstablished && (len = getSn_TX_FSR(s)) > 0)
         {
-            uint16_t size = pStreamOutBufPtr - streamOutBuf;
-            if (len > size)
-                len = size;
-            send(s, streamOutBuf, len);
+            if (bufOut.getPtr()>bufOut.getEndPtr())
+            {
+                // Block crosses buffer boundary
+                send(s, bufOut.getPtr(), bufOut.curToEnd());
+                send(s, bufOut.getStartPtr(), bufOut.endToStart());
+            }
+            else
+            {
+                uint16_t size = bufOut.getSize();
+                if (len > size)
+                    len = size;
+                send(s, bufOut.getPtr(), len);
+            }
+            bufOut.setCurToEnd();
         }
-        else
-            return;
 #endif
-        pStreamOutBufPtr = streamOutBuf;
-         bFlushOutBuffer = false;
-        // updateFifoReadAhead();
-    }
+        bFlushOutBuffer = false;
+     }
 #endif
 }

@@ -63,12 +63,12 @@ static void SD_CS_DISABLE()
   }
 #endif
 
-static void spi_transmit(BYTE data)
+static __force_inline void spi_transmit(BYTE data)
 {
   spi_write_blocking(_SPI, &data, 1);
 }
 
-static BYTE spi_receive()
+static __force_inline BYTE spi_receive()
 {
   BYTE data;
   spi_read_blocking(_SPI, 0xff, &data, 1);

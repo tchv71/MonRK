@@ -9,14 +9,14 @@
 #define DATA_OUT()    gpio_set_dir_out_masked(GPIO_CD_MASK)
 #define DATA_IN()     gpio_set_dir_in_masked(GPIO_CD_MASK)
 
-#ifndef USE_DMA
+#if !USE_DMA
 void wait();
 #endif
 void sendStart(BYTE c); 
 void sendByte(BYTE c);
 void recvStart();
 BYTE wrecv();
-#ifdef USE_DMA
+#if USE_DMA
 void __not_in_flash_func(dma_receive)(BYTE* ptr1, WORD len);
 void __not_in_flash_func(dma_send)(BYTE* ptr1, WORD len);
 void sendFlush();

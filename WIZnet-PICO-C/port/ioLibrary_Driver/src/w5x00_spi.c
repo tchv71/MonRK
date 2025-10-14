@@ -17,7 +17,7 @@
 #include "w5x00_spi.h"
 #include "board_list.h"
 
-#if (DEVICE_BOARD_NAME == W55RP20_EVB_PICO)
+#if (DEVICE_BOARD_NAME == W55RP20_EVB_PICO) || defined(USE_SPI_PIO)
 #include "wiznet_spi_pio.h"
 #endif
 

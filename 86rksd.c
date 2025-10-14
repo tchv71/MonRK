@@ -123,7 +123,7 @@ void readInt(char rks)
       // Посылаем адрес загрузки
       sendByte(STA_OK_RKS);
       sendBin(buf, 2);
-#ifndef USE_DMA
+#if !USE_DMA
       sendByte (STA_WAIT);
 #endif
       // Корректируем указатели
@@ -149,7 +149,7 @@ void readInt(char rks)
     // Отправляем блок
     sendByte(STA_OK_BLOCK);
     sendBin((BYTE *)&readedLength, 2);
-#ifdef USE_DMA
+#if USE_DMA
     sendFlush();
     sleep_ms(10);
     dma_send(wptr, readedLength);
@@ -178,7 +178,7 @@ void cmd_ver()
     flash char *ver = "V1.0 10-05-2014 ";
     sendBinf(ver, 16);
   }
-#ifdef USE_DMA
+#if USE_DMA
   sendFlush();
 #endif
 }
@@ -303,7 +303,7 @@ void cmd_find()
 
     /* Отправляем */
     sendByte(STA_OK_ENTRY);
-#ifndef USE_DMA
+#if !USE_DMA
     sendBin ((BYTE*) &info, sizeof(info));
     sendByte (STA_WAIT);
 #else
@@ -487,7 +487,7 @@ void cmd_write()
     // Принимаем от компьютера блок данных
     sendByte(STA_OK_WRITE);
     sendBin((BYTE *)&fs_file_wlen, 2);
-#ifndef USE_DMA
+#if !USE_DMA
     recvStart();
     recvBin(fs_file_wbuf, fs_file_wlen);
 #else
@@ -734,7 +734,7 @@ BYTE RkSd_Loop()
   {
     // Проверяем наличие карты
     sendStart(STA_START);
-#ifndef USE_DMA
+#if !USE_DMA
     sendByte (STA_WAIT);
 #endif
     //if (fs_check ())
@@ -807,12 +807,12 @@ BYTE RkSd_Loop()
       // Вывод ошибки
       if (lastError && c != STA_START) 
         sendStart(lastError);
-#ifdef USE_DMA
+#if USE_DMA
       sendFlush();
 #endif
     }
 
-#ifndef USE_DMA
+#if !USE_DMA
     // Порт работает на выход
     wait();
     DATA_OUT();

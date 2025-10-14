@@ -34,7 +34,8 @@ CON,PRN,AUX,CLOCK$,NUL,COM1,COM2,COM3,COM4,LPT1,LPT2,LPT3
 
 /* Для наглядности */
 
-#define LD_WORD(ptr) (*(WORD *)(ptr))
+#define LD_WORD(ptr) (*(BYTE *)(ptr)+(*(((BYTE*)(ptr))+1))*256)
+#define LD_WORD2(ptr) (*(WORD *)(ptr))
 #define LD_DWORD(ptr) (*(DWORD *)(ptr))
 
 /* Значения fs_type */
@@ -501,7 +502,7 @@ static BYTE fs_allocCluster(DIS(BYTE freeSpace))
       {
         if (LD_WORD(a) == 0)
         {
-          DIS(if (!freeSpace) {) LD_WORD(a) = (WORD)LAST_CLUSTER; goto founded; DIS( } fs_file.sector++;)
+          DIS(if (!freeSpace) {) LD_WORD2(a) = (WORD)LAST_CLUSTER; goto founded; DIS( } fs_file.sector++;)
         }
         a += 2;
       }
@@ -556,7 +557,7 @@ static BYTE fs_setNextCluster(DWORD cluster)
   {
     a = (WORD *)buf + (BYTE)cluster;
     prev = LD_WORD(a);
-    LD_WORD(a) = (WORD)fs_tmp;
+    LD_WORD2(a) = (WORD)fs_tmp;
   }
   else
   {
@@ -584,8 +585,8 @@ static BYTE fs_setNextCluster(DWORD cluster)
 
 static void fs_setEntryCluster(BYTE *entry, DWORD cluster)
 {
-  LD_WORD(entry + DIR_FstClusLO) = (WORD)(cluster);
-  LD_WORD(entry + DIR_FstClusHI) = (WORD)(cluster >> 16);
+  LD_WORD2(entry + DIR_FstClusLO) = (WORD)(cluster);
+  LD_WORD2(entry + DIR_FstClusHI) = (WORD)(cluster >> 16);
 }
 
 /**************************************************************************
@@ -1132,13 +1133,13 @@ static void fs_set_entry_timestamp(BYTE *entry, BYTE whichTs)
     WORD date = t.day | (t.month << 5) | ((t.year >= 80 ? t.year - 80 : t.year + 20) << 9);
     if (whichTs & TS_WRT)
     {
-      LD_WORD(entry + DIR_WrtTime) = time;
-      LD_WORD(entry + DIR_WrtDate) = date;
+      LD_WORD2(entry + DIR_WrtTime) = time;
+      LD_WORD2(entry + DIR_WrtDate) = date;
     }
     if (whichTs & TS_CRT)
     {
-      LD_WORD(entry + DIR_CrtTime) = time;
-      LD_WORD(entry + DIR_CrtDate) = date;
+      LD_WORD2(entry + DIR_CrtTime) = time;
+      LD_WORD2(entry + DIR_CrtDate) = date;
     }
   }
 }

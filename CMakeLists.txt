@@ -44,7 +44,6 @@ pico_sdk_init()
 add_subdirectory(WIZnet-PICO-C)
 
 # Add executable. Default name is the project name, version 0.1
-
 add_executable(MonRk )
 target_sources(MonRk PRIVATE main.cpp
 # Serial.cpp RP2040USB.cpp
@@ -61,7 +60,7 @@ pico_generate_pio_header(MonRk ${CMAKE_CURRENT_LIST_DIR}/fifo.pio)
 # Modify the below lines to enable/disable output over UART/USB
 pico_enable_stdio_uart(MonRk 0)
 pico_enable_stdio_usb(MonRk 1)
-
+#set(PICO_DEOPTIMIZED_DEBUG 1 CACHE BOOL ON FORCE)
 # Add the standard library to the build
 target_link_libraries(MonRk PRIVATE
         pico_stdlib

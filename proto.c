@@ -41,9 +41,9 @@ void wait();
 void sendStart(BYTE c)
 {
 #if !USE_DMA
+  WRITE_DATA(c);
   wait ();
   DATA_BUS_OUT();
-  WRITE_DATA(c);
 #else
   dm_mode = DM_SEND;
   cmd_buf_send_ptr = cmd_buf_send;
@@ -51,7 +51,7 @@ void sendStart(BYTE c)
 #endif
 }
 
-#if !USE_DMA
+#if USE_DMA
 void recvStartNoDma()
 {
   if (dm_mode == DM_SEND && cmd_buf_send_ptr != cmd_buf_send)
@@ -94,7 +94,7 @@ void sendByte(BYTE c)
   *cmd_buf_send_ptr++=c;
 #endif
 }
-#if !USE_DMA
+#if USE_DMA
 WORD lSend;
 void sendFlush()
 {
