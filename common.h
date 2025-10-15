@@ -12,7 +12,7 @@
 
 #define CONST
 #define USE_DMA 0
-#define USE_ETHERNET 0
+#define USE_ETHERNET 1
 #define USE_SERIAL_DEBUG 1
 
 typedef uint8_t   BYTE;
@@ -22,7 +22,7 @@ typedef uint32_t  DWORD;
 #ifdef __cplusplus
 extern "C" {
 #endif
-mutex_t* get_sd_mutex();
+recursive_mutex_t* get_sd_mutex();
 extern uint8_t v55_buf[4];
 #ifdef __cplusplus
 }

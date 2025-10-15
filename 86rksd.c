@@ -752,7 +752,8 @@ BYTE RkSd_Loop()
       // Сбрасываем ошибку
       lastError = 0;
 
-      mutex_enter_blocking(get_sd_mutex());
+      recursive_mutex_enter_blocking(get_sd_mutex());
+
       // Принимаем аргументы
       switch (c)
       {
@@ -803,6 +804,7 @@ BYTE RkSd_Loop()
       default:
         lastError = ERR_INVALID_COMMAND;
       }
+      recursive_mutex_exit(get_sd_mutex());
 
       // Вывод ошибки
       if (lastError && c != STA_START) 
@@ -820,7 +822,6 @@ BYTE RkSd_Loop()
 
     // Гасим светодиод
     LedOff();
-    mutex_exit(get_sd_mutex());
     return 1;
   }
 }
@@ -1006,9 +1007,10 @@ void __not_in_flash_func(wait)()
 #endif
 }
 auto_init_mutex(sd_mutex);
-mutex_t* get_sd_mutex()
+auto_init_recursive_mutex(sd_mutex2);
+recursive_mutex_t* get_sd_mutex()
 {
-  return &sd_mutex;
+  return &sd_mutex2;
 }
 
 extern volatile uint16_t addr;

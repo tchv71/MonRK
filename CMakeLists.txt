@@ -60,7 +60,7 @@ pico_generate_pio_header(MonRk ${CMAKE_CURRENT_LIST_DIR}/fifo.pio)
 # Modify the below lines to enable/disable output over UART/USB
 pico_enable_stdio_uart(MonRk 0)
 pico_enable_stdio_usb(MonRk 1)
-#set(PICO_DEOPTIMIZED_DEBUG 1 CACHE BOOL ON FORCE)
+set(PICO_DEOPTIMIZED_DEBUG 0 CACHE BOOL OFF FORCE)
 # Add the standard library to the build
 target_link_libraries(MonRk PRIVATE
         pico_stdlib

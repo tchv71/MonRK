@@ -46,7 +46,7 @@ public:
     {
         *m_End++ = c;
         if (m_End == m_Buf + sizeof(m_Buf))
-            m_End = m_Buf;  
+            m_End = m_Buf;
     }
     size_t getMaxSize() const { return sizeof(m_Buf); }
     size_t getSize() const
@@ -57,40 +57,37 @@ public:
         return sizeof(m_Buf) + diff;
     }
     ptrdiff_t remains(int len) { return (m_Buf + sizeof(m_Buf)) - (m_End + len); }
-    uint8_t* getPtr() { return m_Ptr; }
-    uint8_t* getEndPtr() { return m_End; }
-    uint8_t* getStartPtr() { return m_Buf; }
-    void movePtr(uint8_t* &Ptr, size_t s)
+    uint8_t *getPtr() { return m_Ptr; }
+    uint8_t *getEndPtr() { return m_End; }
+    uint8_t *getStartPtr() { return m_Buf; }
+    void movePtr(uint8_t *&Ptr, size_t s)
     {
         Ptr += s;
-        const uint8_t* BufEnd = m_Buf + sizeof(m_Buf);
+        const uint8_t *BufEnd = m_Buf + sizeof(m_Buf);
         if (Ptr >= BufEnd)
             Ptr = m_Buf + (Ptr - BufEnd);
     }
-    void reserve(size_t s) { movePtr(m_End, s);}
+    void reserve(size_t s) { movePtr(m_End, s); }
     void advance(size_t s) { movePtr(m_Ptr, s); }
     void setEndToStart(size_t s) { m_End = m_Buf + s; }
     void setCurToEnd() { m_Ptr = m_End; }
-    size_t curToEnd() const { return m_Buf + sizeof(m_Buf) - m_Ptr;}
+    size_t curToEnd() const { return m_Buf + sizeof(m_Buf) - m_Ptr; }
     size_t endToStart() const { return m_End - m_Buf; }
+
 protected:
-    uint8_t* m_Ptr;
-    uint8_t* m_End;
+    uint8_t *m_Ptr;
+    uint8_t *m_End;
     uint8_t m_Buf[size];
 };
 
-static CircBuffer<10*1024> bufIn;
-//static uint8_t streamInBuf[10 * 1024];
-//static uint8_t *pStreamInBufEnd;
-//static uint8_t *pStreamInBufPtr;
-
-
+static CircBuffer<10 * 1024> bufIn;
+// static uint8_t streamInBuf[10 * 1024];
+// static uint8_t *pStreamInBufEnd;
+// static uint8_t *pStreamInBufPtr;
 
 static CircBuffer<1024> bufOut;
-//static uint8_t streamOutBuf[1024];
-//static uint8_t *pStreamOutBufPtr;
-
-
+// static uint8_t streamOutBuf[1024];
+// static uint8_t *pStreamOutBufPtr;
 
 static volatile bool bFlushOutBuffer = false;
 static volatile uint8_t outLength = 0xff;
@@ -421,7 +418,7 @@ void networkInit()
     multicore_fifo_pop_blocking();
 }
 
-//const uint16_t DATA_BUF_SIZE = sizeof(streamInBuf);
+// const uint16_t DATA_BUF_SIZE = sizeof(streamInBuf);
 bool bSockEstablished = false;
 bool bSerialEstablished = false;
 
@@ -475,28 +472,33 @@ void __not_in_flash_func(loop)()
     while (updateFifoReadAhead())
         ;
 #if USE_ETHERNET
-    uint8_t retval;
-    // mutex_enter_blocking(get_sd_mutex());
-    /* Run FTP server */
-    if ((retval = ftpd_run(g_ftp_buf)) < 0)
+    if (recursive_mutex_try_enter(get_sd_mutex(), NULL))
     {
-        // printf(" FTP server error : %d\n", retval);
+        uint8_t retval;
+        // mutex_enter_blocking(get_sd_mutex());
+        /* Run FTP server */
+        if ((retval = ftpd_run(g_ftp_buf)) < 0)
+        {
+            // printf(" FTP server error : %d\n", retval);
 
-        while (1)
-            ;
-    }
-    // mutex_exit(get_sd_mutex());
-    if ((retval = ftpd_cpm_run(g_ftp_buf_cpm)) < 0)
-    {
-        // printf(" FTP server error : %d\n", retval);
+            while (1)
+                ;
+        }
+        // mutex_exit(get_sd_mutex());
+        if ((retval = ftpd_cpm_run(g_ftp_buf_cpm)) < 0)
+        {
+            // printf(" FTP server error : %d\n", retval);
 
-        while (1)
-            ;
+            while (1)
+                ;
+        }
+        recursive_mutex_exit(get_sd_mutex());
     }
 #endif
     static uint8_t res;
     static uint16_t len;
 #if USE_ETHERNET
+    //recursive_mutex_enter_blocking(get_sd_mutex());
     {
         switch ((res = getSn_SR(s)))
         {
@@ -555,6 +557,7 @@ void __not_in_flash_func(loop)()
             break;
         }
     }
+    //recursive_mutex_exit(get_sd_mutex());
 #endif
 #if USE_SERIAL_DEBUG
     if (!bSockEstablished && serial.available() /* && ((currentStatus & TXFULL) == 0) */ /* && pStreamInBufPtr == pStreamInBufEnd */)
@@ -567,10 +570,10 @@ void __not_in_flash_func(loop)()
         // uint32_t ints = save_and_disable_interrupts();
         outLength = 0xFF;
         // restore_interrupts_from_disabled(ints);
-        //updateFifoReadAhead();
+        // updateFifoReadAhead();
     }
 
-    if (bFlushOutBuffer && bufOut.getSize()>0)
+    if (bFlushOutBuffer && bufOut.getSize() > 0)
     {
         uint16_t len;
         if (!bSockEstablished && !bSerialEstablished)
@@ -586,7 +589,8 @@ void __not_in_flash_func(loop)()
 #if USE_ETHERNET
         else if (bSockEstablished && (len = getSn_TX_FSR(s)) > 0)
         {
-            if (bufOut.getPtr()>bufOut.getEndPtr())
+            //recursive_mutex_enter_blocking(get_sd_mutex());
+            if (bufOut.getPtr() > bufOut.getEndPtr())
             {
                 // Block crosses buffer boundary
                 send(s, bufOut.getPtr(), bufOut.curToEnd());
@@ -600,9 +604,10 @@ void __not_in_flash_func(loop)()
                 send(s, bufOut.getPtr(), len);
             }
             bufOut.setCurToEnd();
+            //recursive_mutex_exit(get_sd_mutex());
         }
 #endif
         bFlushOutBuffer = false;
-     }
+    }
 #endif
 }
