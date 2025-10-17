@@ -28,11 +28,11 @@
 
 .program fifoRead
 .define public CSR_PIN 26
-.side_set 1 opt
+;.side_set 1 opt
 .wrap_target
 start:
   mov osr, null       ; change CD0-7 pindirs to inputs
-  out pindirs, 8 side 1
+  out pindirs, 8; side 1
 
   wait 0 gpio CSR_PIN ; wait for CSR to go low (active)
   jmp pin readStatus  ; if PIN_A0_28 'mode' is high, read status bits 
@@ -51,7 +51,7 @@ l02:
   out pins, 8       ; output the status byte (1 - is busy)
 endPart:
   mov osr, !null
-  out pindirs, 8 side 0   ; set up CD0-7 as outputs
+  out pindirs, 8; side 1   ; set up CD0-7 as outputs
   wait 1 gpio CSR_PIN ; wait for CSR to go high (inactive) 
 .wrap
 
@@ -66,8 +66,8 @@ endPart:
 
   wait 0 gpio PIN_nCS2
   jmp pin romRead
-  wait 1 gpio PIN_nWR
   mov isr, null
+  wait 1 gpio PIN_nWR
   in pins 26;14+8
   push noblock
   jmp s1

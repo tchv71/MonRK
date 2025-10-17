@@ -109,7 +109,7 @@ void dmaPioInit()
     irq_set_exclusive_handler(PIO0_IRQ_1, pio_irq_handler_rom);
     irq_set_enabled(PIO0_IRQ_1, true);
     pio_sm_set_enabled(FIFO_PIO, dmaRomSm, true /* false */);
-
+    enable_interrupts();
 #if 0
     int dmaReadProgOffset = pio_add_program(FIFO_PIO, &dmaRead_program);
     if (dmaReadProgOffset<0)
@@ -194,7 +194,7 @@ void setup()
     gpio_init_mask(GPIO_CD_MASK | GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
     gpio_set_dir_in_masked(GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
     gpio_init(PIN_DIR);
-    gpio_put(PIN_DIR, 0);
+    gpio_put(PIN_DIR, 1);
     gpio_set_dir(PIN_DIR, GPIO_OUT);
     gpio_set_drive_strength(PIN_DIR, GPIO_DRIVE_STRENGTH_12MA);
     gpio_pull_up(PIN_CD7);
@@ -216,6 +216,7 @@ int main()
     vreg_set_voltage(VREG_VOLTAGE_1_30);
     set_sys_clock_pll(PICO_CLOCK_PLL, PICO_CLOCK_PLL_DIV1, PICO_CLOCK_PLL_DIV2); // 252000
     // set_sys_clock_khz(290000, false);
+    recursive_mutex_init(get_sd_mutex());
     stdio_init_all();
     // stdio_set_translate_crlf(&stdio_usb, false);
 

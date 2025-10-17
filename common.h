@@ -22,8 +22,12 @@ typedef uint32_t  DWORD;
 #ifdef __cplusplus
 extern "C" {
 #endif
-recursive_mutex_t* get_sd_mutex();
-extern uint8_t v55_buf[4];
+extern recursive_mutex_t sd_mutex2;
+inline recursive_mutex_t* get_sd_mutex()
+{
+  return &sd_mutex2;
+}
+extern volatile uint8_t v55_buf[4];
 #ifdef __cplusplus
 }
 #endif

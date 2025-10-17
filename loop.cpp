@@ -244,7 +244,7 @@ void fifoPioInit()
     sm_config_set_jmp_pin(&readFifoConfig, PIN_A0_28);
     sm_config_set_mov_status(&readFifoConfig, STATUS_TX_LESSTHAN, 1);
     sm_config_set_fifo_join(&readFifoConfig, PIO_FIFO_JOIN_TX);
-    sm_config_set_sideset_pin_base(&readFifoConfig, PIN_DIR);
+    //sm_config_set_sideset_pin_base(&readFifoConfig, PIN_DIR);
     sm_config_set_out_pins(&readFifoConfig, PIN_CD7, 8);
     sm_config_set_in_shift(&readFifoConfig, true, false, 32);  // R shift
     sm_config_set_out_shift(&readFifoConfig, true, false, 32); // R shift
@@ -357,6 +357,7 @@ void networkInit()
     multicore_fifo_drain();
 
     wizchip_spi_initialize();
+    //gpio_pull_down(PIN_MISO);
     wizchip_cris_initialize();
 
     wizchip_reset();
@@ -498,8 +499,8 @@ void __not_in_flash_func(loop)()
     static uint8_t res;
     static uint16_t len;
 #if USE_ETHERNET
-    //recursive_mutex_enter_blocking(get_sd_mutex());
     {
+        recursive_mutex_enter_blocking(get_sd_mutex());
         switch ((res = getSn_SR(s)))
         {
         case SOCK_ESTABLISHED:
@@ -556,8 +557,8 @@ void __not_in_flash_func(loop)()
         default:
             break;
         }
+        recursive_mutex_exit(get_sd_mutex());
     }
-    //recursive_mutex_exit(get_sd_mutex());
 #endif
 #if USE_SERIAL_DEBUG
     if (!bSockEstablished && serial.available() /* && ((currentStatus & TXFULL) == 0) */ /* && pStreamInBufPtr == pStreamInBufEnd */)

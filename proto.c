@@ -23,27 +23,25 @@ void DATA_BUS_OUT()
 void DATA_BUS_IN()
 {}
 
-void WRITE_DATA(uint8_t val)
+void __not_in_flash_func(WRITE_DATA)(uint8_t val)
 {
   v55_buf[0] = val;
   pio_sm_put(FIFO_PIO, dmaRomSm, 0xFF << 8 | val);
 }
 
-uint8_t READ_DATA()
+uint8_t __not_in_flash_func(READ_DATA)()
 {
   return v55_buf[0];
 }
 
 #endif
 
-void wait();
-
-void sendStart(BYTE c)
+void __not_in_flash_func(sendStart)(BYTE c)
 {
 #if !USE_DMA
-  WRITE_DATA(c);
   wait ();
   DATA_BUS_OUT();
+  WRITE_DATA(c);
 #else
   dm_mode = DM_SEND;
   cmd_buf_send_ptr = cmd_buf_send;
@@ -61,9 +59,20 @@ void recvStartNoDma()
 }
 
 WORD l;
+#else
+void  inline __time_critical_func(wait)()
+{
+  recursive_mutex_enter_blocking(get_sd_mutex());
+  // Ждем перепад 1->0 A5
+  while ((v55_buf[1] & 0x20) == 0)
+    WAIT_RW_BYTE();
+  while ((v55_buf[1] & 0x20) != 0)
+    WAIT_RW_BYTE();
+    recursive_mutex_exit(get_sd_mutex());
+}
 #endif
 
-void recvStart()
+void __not_in_flash_func(recvStart)()
 {
 #if !USE_DMA
   wait ();
@@ -75,7 +84,7 @@ void recvStart()
 #endif
 }
 
-BYTE wrecv()
+BYTE __not_in_flash_func(wrecv)()
 {
 #if !USE_DMA
   wait ();
@@ -85,7 +94,7 @@ BYTE wrecv()
 #endif
 }
 
-void sendByte(BYTE c)
+void __not_in_flash_func(sendByte)(BYTE c)
 {
 #if !USE_DMA
   wait ();

@@ -238,11 +238,13 @@ static BYTE sd_waitBus(BYTE byte)
 /**************************************************************************
  *  Чтение произвольного участка сектора                                   *
  **************************************************************************/
-
+extern mutex_t sd_mutex;
 BYTE sd_read(BYTE *buffer, DWORD sector, WORD offsetInSector, WORD length)
 {
   BYTE b;
   WORD i;
+
+  recursive_mutex_enter_blocking(get_sd_mutex());
 
   /* Посылаем команду */
   if (sd_sendCommand(READ_SINGLE_BLOCK, sector))
@@ -278,12 +280,14 @@ BYTE sd_read(BYTE *buffer, DWORD sector, WORD offsetInSector, WORD length)
   SD_CS_DISABLE();
   spi_receive();
 
+  recursive_mutex_exit(get_sd_mutex());
   /* Ок */
   return 0;
 
   /* Ошибка и отпускаем CS.*/
 abort:
   SD_CS_DISABLE();
+  recursive_mutex_exit(get_sd_mutex());
   lastError = ERR_DISK_ERR;
   return 1;
 }
@@ -296,6 +300,7 @@ BYTE sd_write512(BYTE *buffer, DWORD sector)
 {
   WORD n;
 
+  recursive_mutex_enter_blocking(get_sd_mutex());
   /* Посылаем команду */
   if (sd_sendCommand(WRITE_SINGLE_BLOCK, sector))
     goto abort;
@@ -326,12 +331,14 @@ BYTE sd_write512(BYTE *buffer, DWORD sector)
   SD_CS_DISABLE();
   spi_receive();
 
+  recursive_mutex_exit(get_sd_mutex());
   /* Ок */
   return 0;
 
   /* Ошибка.*/
 abort:
   SD_CS_DISABLE();
+  recursive_mutex_exit(get_sd_mutex());
   lastError = ERR_DISK_ERR;
   return 1;
 }

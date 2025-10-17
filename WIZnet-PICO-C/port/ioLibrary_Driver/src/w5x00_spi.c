@@ -32,7 +32,7 @@
  * Variables
  * ----------------------------------------------------------------------------------------------------
  */
-static critical_section_t g_wizchip_cri_sec;
+/* static */ critical_section_t g_wizchip_cri_sec;
 
 #ifdef USE_SPI_DMA
 static uint dma_tx;
@@ -62,7 +62,7 @@ wiznet_spi_handle_t spi_handle;
  * Functions
  * ----------------------------------------------------------------------------------------------------
  */
-static inline void wizchip_select(void)
+static /* inline */ void wizchip_select(void)
 {
     gpio_put(PIN_CS, 0);
 }
@@ -178,7 +178,7 @@ void wizchip_spi_initialize(void)
 
 #else
     // this example will use SPI0 at 5MHz
-    spi_init(SPI_PORT, 5000 * 1000);
+    spi_init(SPI_PORT, 30000 * 1000);
 
     gpio_set_function(PIN_SCK, GPIO_FUNC_SPI);
     gpio_set_function(PIN_MOSI, GPIO_FUNC_SPI);

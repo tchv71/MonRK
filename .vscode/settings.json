@@ -61,7 +61,8 @@
         "stdio.h": "c",
         "fcntl.h": "c",
         "ftpd_cpm.h": "c",
-        "cpmfs.h": "c"
+        "cpmfs.h": "c",
+        "w5x00_spi.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }

@@ -10,7 +10,10 @@
 #define DATA_IN()     gpio_set_dir_in_masked(GPIO_CD_MASK)
 
 #if !USE_DMA
-void wait();
+extern critical_section_t g_wizchip_cri_sec;
+#define WAIT_RW_BYTE()
+
+void  __time_critical_func(wait)();
 #endif
 void sendStart(BYTE c); 
 void sendByte(BYTE c);

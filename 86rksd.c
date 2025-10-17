@@ -105,7 +105,10 @@ void readInt(char rks)
     readLength -= readedLength;
 
     // Читаем блок
-    if (fs_read0(buf, readedLength))
+    recursive_mutex_enter_blocking(get_sd_mutex());
+    BYTE res = fs_read0(buf, readedLength);
+    recursive_mutex_exit(get_sd_mutex());
+    if (res)
       return;
 
     // Заголовок RKS файла
@@ -199,8 +202,10 @@ void cmd_boot_exec()
       strcpy((char*) buf, /* (const char*) (nCS_GPIO_Port->IDR & nCS_Pin) ?  "boota/sdbios.rk" :  */bootSdbiosRk);
 
   // Открываем файл
+  recursive_mutex_enter_blocking(get_sd_mutex());
   if (fs_open())
     return;
+  recursive_mutex_exit(get_sd_mutex());
 
   // Максимальный размер файла
   readLength = 0xFFFF;
@@ -752,7 +757,7 @@ BYTE RkSd_Loop()
       // Сбрасываем ошибку
       lastError = 0;
 
-      recursive_mutex_enter_blocking(get_sd_mutex());
+      //recursive_mutex_enter_blocking(get_sd_mutex());
 
       // Принимаем аргументы
       switch (c)
@@ -804,7 +809,7 @@ BYTE RkSd_Loop()
       default:
         lastError = ERR_INVALID_COMMAND;
       }
-      recursive_mutex_exit(get_sd_mutex());
+      //recursive_mutex_exit(get_sd_mutex());
 
       // Вывод ошибки
       if (lastError && c != STA_START) 
@@ -814,7 +819,7 @@ BYTE RkSd_Loop()
 #endif
     }
 
-#if !USE_DMA
+#if 0// !USE_DMA
     // Порт работает на выход
     wait();
     DATA_OUT();
@@ -941,7 +946,7 @@ static inline void WRITE_DATA(BYTE c)
   gpio_set_dir_in_masked(GPIO_CD_MASK);
 }
 
-uint8_t v55_buf[4] = {0,0,0,0};
+volatile uint8_t v55_buf[4] = {0,0,0,0};
 
 static __force_inline uint16_t __not_in_flash_func(READ_ADDR)()
 {
@@ -950,105 +955,18 @@ static __force_inline uint16_t __not_in_flash_func(READ_ADDR)()
 
 bool bDir = false;
 
-static __force_inline void __not_in_flash_func(WAIT_RW_BYTE)()
-{
-  uint32_t val;
-  do
-  {
-    val = gpio_get_all();
-  } while ((val & nCS2_MASK) !=0/*  || (val & (nWR_MASK | nRD_MASK)) == (nWR_MASK | nRD_MASK) */);
-  uint8_t addr = (val & (A0_MASK | A1_MASK)) >> PIN_A0;
-  if ((val & nRD_MASK) == 0)
-  {
-    //gpio_put_masked(GPIO_CD_MASK, ((uint32_t)v55_buf[addr]) << PIN_CD7);
-    //gpio_set_dir_out_masked(GPIO_CD_MASK);
-    pio_sm_set_pins_with_mask(FIFO_PIO, fifoReadSm, ((uint32_t)v55_buf[addr]) << PIN_CD7, GPIO_CD_MASK);
-    //pio_sm_set_pindirs_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
-    pio_sm_set_consecutive_pindirs(FIFO_PIO, fifoReadSm, PIN_CD7, 8, true);
-    gpio_put(PIN_DIR, bDir = !bDir);
-    //gpio_put_masked(GPIO_CD_MASK, ((uint32_t)v) << PIN_CD7);
-    do
-    {
-      val = gpio_get_all();
-    } while ((val & (nCS2_MASK/*  | nRD_MASK */)) == 0);
-    // gpio_put_masked(GPIO_CD_MASK, ((uint32_t)v) << PIN_CD7);
-    // gpio_put_masked(GPIO_CD_MASK, ((uint32_t)v) << PIN_CD7);
-    //gpio_set_dir_in_masked(GPIO_CD_MASK);
-    pio_sm_set_consecutive_pindirs(FIFO_PIO, fifoReadSm, PIN_CD7, 8, false);
-    gpio_put(PIN_DIR, bDir = !bDir);
-  }
-  else
-  {
-    do
-    {
-      val = gpio_get_all();
-    } while ((val & (nCS2_MASK | nWR_MASK)) == 0);
-    uint8_t v = (val & GPIO_CD_MASK) >> PIN_CD7;
-    v55_buf[addr] = v;
-  }
-}
-
 #endif
 
 //void RkSd_main();
-
-void __not_in_flash_func(wait)()
-{
-#if !USE_DMA
-  // Ждем перепад 1->0 A5
-  while ((v55_buf[1] & 0x20) == 0)
-    WAIT_RW_BYTE();
-  while ((v55_buf[1] & 0x20) != 0)
-    WAIT_RW_BYTE();
-  uint32_t addr = READ_ADDR ();
-  if ((addr & 0x3f) == 0)
-    return;
-  //RkSd_main ();
-#endif
-}
 auto_init_mutex(sd_mutex);
-auto_init_recursive_mutex(sd_mutex2);
-recursive_mutex_t* get_sd_mutex()
-{
-  return &sd_mutex2;
-}
+recursive_mutex_t sd_mutex2;
 
 extern volatile uint16_t addr;
 extern volatile bool bStopRomEmu;
 
 void __not_in_flash_func(EmulateRom)()
 {
-#if 0
-  BYTE lastAddr = 0;
-  //uint32_t ints = save_and_disable_interrupts();
-  disable_interrupts();
-  memset(v55_buf, 0, sizeof(v55_buf));
-  while (1)
-  {
-    WAIT_RW_BYTE();
-    uint16_t addr = READ_ADDR();
-    v55_buf[0] = rom[addr & 0x7f];
-    if (addr == 0x44)
-    {
-      lastAddr = 0x44;
-    }
-    else if (addr == 0x40)
-    {
-      lastAddr = (lastAddr == 0x44) ? 0x40 : 0;
-    }
-    else if (addr == 0)
-    {
-      if (lastAddr == 0x40)
-        break;
-      else
-        lastAddr = 0;
-    }
-  }
-  //restore_interrupts(ints);
-  enable_interrupts();
-#else
   while (!bStopRomEmu) ;
-#endif
 }
 
 
