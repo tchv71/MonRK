@@ -237,7 +237,7 @@ void fifoPioInit()
     pio_sm_set_pins_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
     pio_sm_set_pindirs_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
     // pio_sm_set_consecutive_pindirs(FIFO_PIO, fifoReadSm, DIR, 1, true);
-
+    //hw_set_bits(&FIFO_PIO->input_sync_bypass, (uint32_t)-1/* (1u << PIN_A0_28) | (1u << PIN_CSR) */);
     /* fifoReadProg */
     pio_sm_config readFifoConfig = fifoRead_program_get_default_config(fifoReadProgOffset);
     sm_config_set_in_pins(&readFifoConfig, PIN_CSR);

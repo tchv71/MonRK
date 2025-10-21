@@ -105,9 +105,9 @@ void readInt(char rks)
     readLength -= readedLength;
 
     // Читаем блок
-    recursive_mutex_enter_blocking(get_sd_mutex());
+    MTX_ENTER();
     BYTE res = fs_read0(buf, readedLength);
-    recursive_mutex_exit(get_sd_mutex());
+    MTX_EXIT();
     if (res)
       return;
 
@@ -202,10 +202,10 @@ void cmd_boot_exec()
       strcpy((char*) buf, /* (const char*) (nCS_GPIO_Port->IDR & nCS_Pin) ?  "boota/sdbios.rk" :  */bootSdbiosRk);
 
   // Открываем файл
-  recursive_mutex_enter_blocking(get_sd_mutex());
+  MTX_ENTER();
   if (fs_open())
     return;
-  recursive_mutex_exit(get_sd_mutex());
+  MTX_EXIT();
 
   // Максимальный размер файла
   readLength = 0xFFFF;
@@ -283,15 +283,22 @@ void cmd_find()
   // Открываем папку
   if (buf[0] != ':')
   {
+    MTX_ENTER();
     if (fs_opendir())
       return;
+    MTX_EXIT();
   }
 
   for (; n; --n)
   {
     /* Читаем очередной описатель */
-    if (fs_readdir())
+    MTX_ENTER();
+    BYTE res = fs_readdir();
+    if (res)
+    {
+      MTX_EXIT();
       return;
+    }
 
     /* Конец */
     if (FS_DIRENTRY[0] == 0)
@@ -304,6 +311,7 @@ void cmd_find()
     memcpy(info.fname, FS_DIRENTRY + DIR_Name, 12);
     memcpy(&info.fsize, FS_DIRENTRY + DIR_FileSize, 4);
     memcpy(&info.ftimedate, FS_DIRENTRY + DIR_WrtTime, 4);
+    MTX_EXIT();
     // memcpy(memcpy(memcpy(info.fname, FS_DIRENTRY+DIR_Name, 12, FS_DIRENTRY+DIR_FileSize, 4), FS_DIRENTRY+DIR_WrtTime, 4);
 
     /* Отправляем */
@@ -339,6 +347,7 @@ void cmd_open()
   sendStart(STA_WAIT);
 
   // Открываем/создаем файл/папку
+  MTX_ENTER();
   if (mode == O_SWAP)
   {
     fs_swap();
@@ -359,7 +368,7 @@ void cmd_open()
   {
     lastError = ERR_INVALID_COMMAND;
   }
-
+  MTX_EXIT();
   // Ок
   if (!lastError)
     lastError = STA_OK_CMD;
@@ -373,13 +382,17 @@ void cmd_move()
 {
   recvString();
   sendStart(STA_WAIT);
+  MTX_ENTER();
   fs_openany();
+  MTX_EXIT();
   sendStart(STA_OK_WRITE);
   recvStart();
   recvString();
   sendStart(STA_WAIT);
+  MTX_ENTER();
   if (!lastError)
     fs_move0();
+  MTX_EXIT();
   if (!lastError)
     lastError = STA_OK_CMD;
 }
@@ -400,6 +413,7 @@ void cmd_lseek()
   // Режим передачи и подтверждение
   sendStart(STA_WAIT);
 
+  MTX_ENTER();
   // Размер файла
   if (mode == 100)
   {
@@ -427,6 +441,7 @@ void cmd_lseek()
     if (fs_lseek(off, mode))
       return;
   }
+  MTX_EXIT();
 
   // Передаем результат
   sendByte(STA_OK_CMD);
@@ -448,11 +463,17 @@ void cmd_read()
   // Режим передачи и подтверждение
   sendStart(STA_WAIT);
 
+  MTX_ENTER();
   // Ограничиваем длину длиной файла
   if (fs_getfilesize())
+  {
+    MTX_EXIT();
     return;
+  }
   s = fs_tmp;
-  if (fs_tell())
+  BYTE res = fs_tell();
+  MTX_EXIT();
+  if (res)
     return;
   s -= fs_tmp;
 
@@ -466,7 +487,6 @@ void cmd_read()
 /*******************************************************************************
  * Записать данные в файл                                                       *
  *******************************************************************************/
-
 void cmd_write()
 {
   // Аргументы
@@ -478,7 +498,9 @@ void cmd_write()
   // Конец файла
   if (fs_wtotal == 0)
   {
+    MTX_ENTER();
     fs_write_eof();
+    MTX_EXIT();
     lastError = STA_OK_CMD;
     return;
   }
@@ -486,7 +508,10 @@ void cmd_write()
   // Запись данных
   do
   {
-    if (fs_write_start())
+    MTX_ENTER();
+    BYTE res = fs_write_start();
+    MTX_EXIT();
+    if (res)
       return;
 
     // Принимаем от компьютера блок данных
@@ -500,8 +525,10 @@ void cmd_write()
     dma_receive(fs_file_wbuf, fs_file_wlen);
 #endif
     sendStart(STA_WAIT);
-
-    if (fs_write_end())
+    MTX_ENTER();
+    res = fs_write_end();
+    MTX_EXIT();
+    if (res)
       return;
   } while (fs_wtotal);
 
@@ -757,7 +784,7 @@ BYTE RkSd_Loop()
       // Сбрасываем ошибку
       lastError = 0;
 
-      //recursive_mutex_enter_blocking(get_sd_mutex());
+      //MTX_ENTER();
 
       // Принимаем аргументы
       switch (c)
@@ -809,7 +836,7 @@ BYTE RkSd_Loop()
       default:
         lastError = ERR_INVALID_COMMAND;
       }
-      //recursive_mutex_exit(get_sd_mutex());
+      //MTX_EXIT();
 
       // Вывод ошибки
       if (lastError && c != STA_START) 

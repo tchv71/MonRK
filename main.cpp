@@ -214,8 +214,8 @@ void setup()
 int main()
 {
     vreg_set_voltage(VREG_VOLTAGE_1_30);
-    set_sys_clock_pll(PICO_CLOCK_PLL, PICO_CLOCK_PLL_DIV1, PICO_CLOCK_PLL_DIV2); // 252000
-    // set_sys_clock_khz(290000, false);
+    //set_sys_clock_pll(PICO_CLOCK_PLL, PICO_CLOCK_PLL_DIV1, PICO_CLOCK_PLL_DIV2); // 252000
+    set_sys_clock_khz(320000, false);
     recursive_mutex_init(get_sd_mutex());
     stdio_init_all();
     // stdio_set_translate_crlf(&stdio_usb, false);
