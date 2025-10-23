@@ -34,16 +34,20 @@ BYTE sd_sdhc; /* Используется SDHC карта */
 
 static void SD_CS_ENABLE()
 {
+  MTX_ENTER();
   gpio_put(PIN_SPI_CSn, 0);
   uint8_t fill = SPI_FILL_CHAR;
   spi_write_blocking(_SPI, &fill, 1);
+  MTX_EXIT();
 }
 
 static void SD_CS_DISABLE()
 {
+  MTX_ENTER();
   gpio_put(PIN_SPI_CSn, 1);
   uint8_t fill = SPI_FILL_CHAR;
   spi_write_blocking(_SPI, &fill, 1);
+  MTX_EXIT();
 }
 /* Совместимость с разными версиями CodeVisionAVR */
 #ifndef SPI2X
@@ -139,13 +143,18 @@ static BYTE sd_sendCommand(BYTE cmd, DWORD arg)
 
 BYTE sd_check()
 {
+  MTX_ENTER();
   BYTE i = 0;
   do
   {
     sd_sendCommand(APP_CMD, 0);
     if (sd_sendCommand(SD_SEND_OP_COND, 0x40000000) == 0)
+    {
+      MTX_EXIT();
       return 0;
+    }
   } while (--i);
+  MTX_EXIT();
   return 1;
 }
 
@@ -156,7 +165,7 @@ BYTE sd_check()
 static BYTE sd_init_int()
 {
   BYTE i;
-
+  MTX_ENTER();
   /* Сбрасываем SDHC флаг */
   sd_sdhc = 0;
 
@@ -184,9 +193,10 @@ static BYTE sd_init_int()
     if (sd_sendCommand(READ_OCR, 0) != 0)
       goto abort;
   }
-
+  MTX_EXIT();
   return 0;
 abort:
+  MTX_EXIT();
   return 1;
 }
 
@@ -196,6 +206,7 @@ abort:
 
 BYTE sd_init()
 {
+  MTX_ENTER();
   BYTE tries;
 
   /* Освобождаем CS на всякий случай */
@@ -216,7 +227,7 @@ BYTE sd_init()
   /* Включаем максимальную скорость */
   // SPI_HIGHSPEED
   spi_set_baudrate(_SPI, 10 * 1000 * 1000);
-
+  MTX_EXIT();
   return 0;
 }
 
@@ -244,7 +255,7 @@ BYTE sd_read(BYTE *buffer, DWORD sector, WORD offsetInSector, WORD length)
   BYTE b;
   WORD i;
 
-  recursive_mutex_enter_blocking(get_sd_mutex());
+  MTX_ENTER();
 
   /* Посылаем команду */
   if (sd_sendCommand(READ_SINGLE_BLOCK, sector))
@@ -280,14 +291,14 @@ BYTE sd_read(BYTE *buffer, DWORD sector, WORD offsetInSector, WORD length)
   SD_CS_DISABLE();
   spi_receive();
 
-  recursive_mutex_exit(get_sd_mutex());
+  MTX_EXIT();
   /* Ок */
   return 0;
 
   /* Ошибка и отпускаем CS.*/
 abort:
   SD_CS_DISABLE();
-  recursive_mutex_exit(get_sd_mutex());
+  MTX_EXIT();
   lastError = ERR_DISK_ERR;
   return 1;
 }
@@ -300,7 +311,7 @@ BYTE sd_write512(BYTE *buffer, DWORD sector)
 {
   WORD n;
 
-  recursive_mutex_enter_blocking(get_sd_mutex());
+  MTX_ENTER();
   /* Посылаем команду */
   if (sd_sendCommand(WRITE_SINGLE_BLOCK, sector))
     goto abort;
@@ -331,14 +342,14 @@ BYTE sd_write512(BYTE *buffer, DWORD sector)
   SD_CS_DISABLE();
   spi_receive();
 
-  recursive_mutex_exit(get_sd_mutex());
+  MTX_EXIT();
   /* Ок */
   return 0;
 
   /* Ошибка.*/
 abort:
   SD_CS_DISABLE();
-  recursive_mutex_exit(get_sd_mutex());
+  MTX_EXIT();
   lastError = ERR_DISK_ERR;
   return 1;
 }
@@ -520,6 +531,7 @@ SD_Error SD_WriteMultiBlocks(uint8_t *pBuffer, uint32_t WriteSector, uint16_t Bl
  */
 SD_Error SD_GetCSDRegister(SD_CSD *SD_csd)
 {
+  MTX_ENTER();
 
   SD_Error rvalue = SD_RESPONSE_FAILURE;
   uint8_t CSD_Tab[16];
@@ -713,6 +725,7 @@ SD_Error SD_GetCSDRegister(SD_CSD *SD_csd)
     SD_csd->Reserved4 = 1;
   }
   /*!< Return the response */
+  MTX_EXIT();
   return rvalue;
 }
 
@@ -729,7 +742,7 @@ SD_Error SD_GetCIDRegister(SD_CID *SD_cid)
 {
   SD_Error rvalue = SD_RESPONSE_FAILURE;
   uint8_t CID_Tab[16];
-
+  MTX_ENTER();
 #if 0
     /*!< SD chip select low */
     SD_CS_LOW();
@@ -813,5 +826,6 @@ SD_Error SD_GetCIDRegister(SD_CID *SD_cid)
   SD_cid->Reserved2 = 1;
 
   /*!< Return the reponse */
+  MTX_EXIT();
   return rvalue;
 }

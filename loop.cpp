@@ -22,72 +22,13 @@ extern "C"
 #include "ftpd_cpm.h"
 #include "pico/multicore.h"
 #include "pico/sync.h"
+#include "CircBuffer.h"
 
 const uint8_t RXEMPTY = 1; // MASK FOR RX BUFFER EMPTY
 
-template <int size>
-class CircBuffer
-{
-public:
-    CircBuffer() : m_Ptr(m_Buf), m_End(m_Buf) {}
-    bool isEmpty() const { return m_Ptr == m_End; }
-    uint8_t getByte()
-    {
-        uint8_t c = *m_Ptr++;
-        if (m_Ptr == m_Buf + sizeof(m_Buf))
-            m_Ptr = m_Buf;
-        return c;
-    }
-    void clear()
-    {
-        m_Ptr = m_End = m_Buf;
-    }
-    void put(uint8_t c)
-    {
-        *m_End++ = c;
-        if (m_End == m_Buf + sizeof(m_Buf))
-            m_End = m_Buf;
-    }
-    size_t getMaxSize() const { return sizeof(m_Buf); }
-    size_t getSize() const
-    {
-        ptrdiff_t diff = m_End - m_Ptr;
-        if (diff >= 0)
-            return diff;
-        return sizeof(m_Buf) + diff;
-    }
-    ptrdiff_t remains(int len) { return (m_Buf + sizeof(m_Buf)) - (m_End + len); }
-    uint8_t *getPtr() { return m_Ptr; }
-    uint8_t *getEndPtr() { return m_End; }
-    uint8_t *getStartPtr() { return m_Buf; }
-    void movePtr(uint8_t *&Ptr, size_t s)
-    {
-        Ptr += s;
-        const uint8_t *BufEnd = m_Buf + sizeof(m_Buf);
-        if (Ptr >= BufEnd)
-            Ptr = m_Buf + (Ptr - BufEnd);
-    }
-    void reserve(size_t s) { movePtr(m_End, s); }
-    void advance(size_t s) { movePtr(m_Ptr, s); }
-    void setEndToStart(size_t s) { m_End = m_Buf + s; }
-    void setCurToEnd() { m_Ptr = m_End; }
-    size_t curToEnd() const { return m_Buf + sizeof(m_Buf) - m_Ptr; }
-    size_t endToStart() const { return m_End - m_Buf; }
 
-protected:
-    uint8_t *m_Ptr;
-    uint8_t *m_End;
-    uint8_t m_Buf[size];
-};
-
-static CircBuffer<10 * 1024> bufIn;
-// static uint8_t streamInBuf[10 * 1024];
-// static uint8_t *pStreamInBufEnd;
-// static uint8_t *pStreamInBufPtr;
-
-static CircBuffer<1024> bufOut;
-// static uint8_t streamOutBuf[1024];
-// static uint8_t *pStreamOutBufPtr;
+CircBuffer<10 * 1024> bufIn;
+CircBuffer<1024> bufOut;
 
 static volatile bool bFlushOutBuffer = false;
 static volatile uint8_t outLength = 0xff;
@@ -131,8 +72,9 @@ extern "C" const uint dmaRomSm;
 
 volatile uint16_t addr = 0;
 static uint16_t lastAddr = 0;
+static uint16_t lastAddr2 = 0;
 volatile bool bStopRomEmu = false;
-
+volatile bool bEvent = false;
 void __not_in_flash_func(pio_irq_handler_rom)()
 {
     if (pio_sm_is_rx_fifo_empty(FIFO_PIO, dmaRomSm))
@@ -145,18 +87,27 @@ void __not_in_flash_func(pio_irq_handler_rom)()
     {
     case 1:
         addr = v_val;
+        if (addr == 0x20)
+            lastAddr2 = addr;
+        else if (addr == 0 && lastAddr2 == 0x20)
+        {
+            bEvent = true;
+            __sev();
+        }
         break;
     case 2:
     {
         addr |= ((int16_t)v_val) << 8;
         uint8_t r_val = rom[addr & 0x7f];
-        pio_sm_put(FIFO_PIO, dmaRomSm, 0xFF << 8 | r_val);
+        pio_sm_put_blocking(FIFO_PIO, dmaRomSm, 0xFF << 8 | r_val);
     }
     break;
     default:
         break;
     }
     v55_buf[w_addr] = v_val;
+    if (bStopRomEmu)
+        return;
 #if 1
     if (addr == 0x44)
     {
@@ -214,66 +165,7 @@ void __not_in_flash_func(pio_irq_handler_read)()
     updateFifoReadAhead();
 }
 #endif
-/*
- * Set up PIOs for pico <-> CPU interface
- */
-void fifoPioInit()
-{
-    bufIn.clear();
-    bufOut.clear();
 
-#if USE_SERIAL_DEBUG
-    pio_sm_claim(FIFO_PIO, fifoReadSm);
-    int fifoReadProgOffset = pio_add_program(FIFO_PIO, &fifoRead_program);
-    if (fifoReadProgOffset < 0)
-        panic("Failed add fifoReadProgram");
-
-    for (uint i = 0; i < 8; ++i)
-    {
-        pio_gpio_init(FIFO_PIO, PIN_CD7 + i);
-        gpio_set_drive_strength(PIN_CD7 + i, GPIO_DRIVE_STRENGTH_12MA);
-    }
-    pio_gpio_init(FIFO_PIO, PIN_DIR);
-    pio_sm_set_pins_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
-    pio_sm_set_pindirs_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
-    // pio_sm_set_consecutive_pindirs(FIFO_PIO, fifoReadSm, DIR, 1, true);
-    //hw_set_bits(&FIFO_PIO->input_sync_bypass, (uint32_t)-1/* (1u << PIN_A0_28) | (1u << PIN_CSR) */);
-    /* fifoReadProg */
-    pio_sm_config readFifoConfig = fifoRead_program_get_default_config(fifoReadProgOffset);
-    sm_config_set_in_pins(&readFifoConfig, PIN_CSR);
-    sm_config_set_jmp_pin(&readFifoConfig, PIN_A0_28);
-    sm_config_set_mov_status(&readFifoConfig, STATUS_TX_LESSTHAN, 1);
-    sm_config_set_fifo_join(&readFifoConfig, PIO_FIFO_JOIN_TX);
-    //sm_config_set_sideset_pin_base(&readFifoConfig, PIN_DIR);
-    sm_config_set_out_pins(&readFifoConfig, PIN_CD7, 8);
-    sm_config_set_in_shift(&readFifoConfig, true, false, 32);  // R shift
-    sm_config_set_out_shift(&readFifoConfig, true, false, 32); // R shift
-    sm_config_set_clkdiv(&readFifoConfig, 1.0f);
-    //
-    pio_sm_init(FIFO_PIO, fifoReadSm, fifoReadProgOffset, &readFifoConfig);
-    // pio_set_irq0_source_enabled(FIFO_PIO, pis_sm0_rx_fifo_not_empty, true);
-    // irq_set_exclusive_handler(PIO0_IRQ_0, pio_irq_handler_read);
-    // irq_set_enabled(PIO0_IRQ_0, true);
-    pio_sm_set_enabled(FIFO_PIO, fifoReadSm, true);
-    // updateFifoReadAhead();
-
-    /* fifoWriteProg */
-    pio_sm_claim(DMA_PIO, fifoWrite2Sm);
-    int fifoWriteProgOffset = pio_add_program(DMA_PIO, &fifoWrite_program);
-    if (fifoWriteProgOffset < 0)
-        panic("Failed add fifoWriteProgram");
-    pio_sm_config writeConfig2 = fifoWrite_program_get_default_config(fifoWriteProgOffset);
-    sm_config_set_in_pins(&writeConfig2, PIN_CD7);
-    sm_config_set_in_shift(&writeConfig2, false, true, 16); // L shift, autopush @ 16 bits
-    sm_config_set_clkdiv(&writeConfig2, 1.0f);
-    //
-    pio_sm_init(DMA_PIO, fifoWrite2Sm, fifoWriteProgOffset, &writeConfig2);
-    pio_sm_set_enabled(DMA_PIO, fifoWrite2Sm, true);
-    pio_set_irq1_source_enabled(DMA_PIO, pis_sm1_rx_fifo_not_empty, true);
-    irq_set_exclusive_handler(PIO1_IRQ_1, pio_irq_handler_write);
-    irq_set_enabled(PIO1_IRQ_1, true);
-#endif
-}
 /* Clock */
 #define PLL_SYS_KHZ (133 * 1000)
 /* Clock */
@@ -473,7 +365,7 @@ void __not_in_flash_func(loop)()
     while (updateFifoReadAhead())
         ;
 #if USE_ETHERNET
-    if (recursive_mutex_try_enter(get_sd_mutex(), NULL))
+    if (MTX_TRY_ENTER())
     {
         uint8_t retval;
         // mutex_enter_blocking(get_sd_mutex());
@@ -493,71 +385,66 @@ void __not_in_flash_func(loop)()
             while (1)
                 ;
         }
-        recursive_mutex_exit(get_sd_mutex());
+        MTX_EXIT();
     }
 #endif
     static uint8_t res;
     static uint16_t len;
 #if USE_ETHERNET
     {
-        recursive_mutex_enter_blocking(get_sd_mutex());
-        switch ((res = getSn_SR(s)))
+        // MTX_ENTER();
+        if (MTX_TRY_ENTER())
         {
-        case SOCK_ESTABLISHED:
-            // Interrupt clear
-            if (getSn_IR(s) & Sn_IR_CON)
+            switch ((res = getSn_SR(s)))
             {
-                setSn_IR(s, Sn_IR_CON);
-            }
-            bSockEstablished = true;
-            while ((len = getSn_RX_RSR(s)) > 0 /*  && pStreamInBufEnd == pStreamInBufPtr */)
-            {
-                // pStreamInBufEnd = pStreamInBufPtr = streamInBuf;
-                if (len > bufIn.getMaxSize())
-                    len = bufIn.getMaxSize();
-                ptrdiff_t bufferRemains = bufIn.remains(len);
-                if (bufferRemains >= 0)
+            case SOCK_ESTABLISHED:
+                // Interrupt clear
+                if (getSn_IR(s) & Sn_IR_CON)
                 {
-                    len = recv(s, bufIn.getEndPtr(), len);
-                    bufIn.reserve(len);
+                    setSn_IR(s, Sn_IR_CON);
                 }
-                else
+                bSockEstablished = true;
+                while ((len = getSn_RX_RSR(s)) > 0 /*  && pStreamInBufEnd == pStreamInBufPtr */)
                 {
-                    recv(s, bufIn.getEndPtr(), len + bufferRemains);
-                    recv(s, bufIn.getStartPtr(), -bufferRemains);
-                    bufIn.setEndToStart(-bufferRemains);
+                    if (len > bufIn.getMaxSize())
+                        len = bufIn.getMaxSize();
+                    ptrdiff_t bufferRemains = bufIn.remains(len);
+                    if (bufferRemains >= 0)
+                    {
+                        len = recv(s, bufIn.getEndPtr(), len);
+                        bufIn.reserve(len);
+                    }
+                    else
+                    {
+                        recv(s, bufIn.getEndPtr(), len + bufferRemains);
+                        recv(s, bufIn.getStartPtr(), -bufferRemains);
+                        bufIn.setEndToStart(-bufferRemains);
+                    }
+                    outLength = 0xFF;
                 }
-                // uint32_t ints = save_and_disable_interrupts();
-                //  if (currentStatus & RXEMPTY)
-                //      pio_sm_clear_fifos(FIFO_PIO, fifoReadSm);
-                // nextValue = *pStreamInBufPtr++;
-                // currentStatus &= ~RXEMPTY;
-                outLength = 0xFF;
-                // updateFifoReadAhead();
-                // nextValue = 0;
-                // restore_interrupts_from_disabled(ints);
+                break;
+            case SOCK_CLOSE_WAIT:
+                disconnect(s);
+                bSockEstablished = false;
+                break;
+
+            case SOCK_CLOSED:
+                socket(s, Sn_MR_TCP, SOCKET_PORT, 0);
+                break;
+
+            case SOCK_INIT:
+                listen(s);
+                break;
+
+            case SOCK_LISTEN:
+                break;
+
+            default:
+                break;
             }
-            break;
-        case SOCK_CLOSE_WAIT:
-            disconnect(s);
-            bSockEstablished = false;
-            break;
-
-        case SOCK_CLOSED:
-            socket(s, Sn_MR_TCP, SOCKET_PORT, 0);
-            break;
-
-        case SOCK_INIT:
-            listen(s);
-            break;
-
-        case SOCK_LISTEN:
-            break;
-
-        default:
-            break;
+            MTX_EXIT();
         }
-        recursive_mutex_exit(get_sd_mutex());
+        // MTX_EXIT();
     }
 #endif
 #if USE_SERIAL_DEBUG
@@ -568,10 +455,7 @@ void __not_in_flash_func(loop)()
         {
             bufIn.put(serial.read());
         }
-        // uint32_t ints = save_and_disable_interrupts();
         outLength = 0xFF;
-        // restore_interrupts_from_disabled(ints);
-        // updateFifoReadAhead();
     }
 
     if (bFlushOutBuffer && bufOut.getSize() > 0)

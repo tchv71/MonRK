@@ -38,8 +38,8 @@
 #define ERR_DATETIME 0x50
 #define STA_OK_BLOCK 0x4F
 
-BYTE buf[1024+16];
-BYTE rom[128];
+__attribute__((aligned(4))) BYTE buf[1024+16];
+__attribute__((aligned(4))) BYTE rom[128];
 #define flash
 
 /*******************************************************************************
@@ -860,13 +860,12 @@ BYTE RkSd_Loop()
 
 //const uint dmaReadSm = 0;
 const uint dmaWriteSm = 0;
-const uint dmaRomSm = 1;
+const uint dmaRomSm = 2;
 const uint dmaReadSm = 1;
 const uint fifoReadSm = 0;
 const uint fifoWrite2Sm = 1;
 extern int res;
-//extern const uint fifoWriteSm;
-extern const uint fifoReadSm;
+
 #define INTS_OFF 0
 void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
 {
@@ -875,6 +874,8 @@ void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
   gpio_put(PIN_DRQ, 1);
   gpio_set_dir(PIN_DRQ, GPIO_OUT);
   pio_gpio_init(FIFO_PIO, PIN_DIR);
+  pio_sm_drain_tx_fifo(FIFO_PIO, dmaReadSm);
+  pio_sm_restart(FIFO_PIO, dmaReadSm);
 #if INTS_OFF
   uint32_t ints = save_and_disable_interrupts();
 #endif
@@ -886,7 +887,7 @@ void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
   restore_interrupts(ints);
 #endif
   while (!pio_sm_is_tx_fifo_empty(FIFO_PIO, dmaReadSm)) ;
-  while (gpio_get(PIN_nDACK) != 0) ;
+  while (gpio_get(PIN_nDACK) == 0) ;
   gpio_put(PIN_DRQ, 0);
 #else
   gpio_init(PIN_DRQ);
@@ -918,15 +919,18 @@ void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
 #if INTS_OFF
   uint32_t ints = save_and_disable_interrupts();
 #endif
+  uint32_t *ptr1 = (uint32_t*)ptr;
+  len /= 4;
   do
   {
-    *ptr++ = pio_sm_get_blocking(DMA_PIO, dmaWriteSm) & 0xFF;
+    *ptr1++ = pio_sm_get_blocking(DMA_PIO, dmaWriteSm);// & 0xFF;
   } while (--len);
 #if INTS_OFF
   restore_interrupts(ints);
 #endif
   gpio_put(PIN_DRQ, 0);
-  #else
+  while (gpio_get(PIN_nDACK) == 0) ;
+#else
   DATA_IN();
   gpio_put(PIN_DRQ, 1);
   uint32_t ints = save_and_disable_interrupts();
@@ -942,6 +946,9 @@ void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
   restore_interrupts(ints);
 #endif
 }
+
+volatile uint8_t v55_buf[4] = {0,0,0,0};
+
 #if USE_DMA
 
 static inline void WRITE_DATA(BYTE c)
@@ -973,7 +980,6 @@ static inline void WRITE_DATA(BYTE c)
   gpio_set_dir_in_masked(GPIO_CD_MASK);
 }
 
-volatile uint8_t v55_buf[4] = {0,0,0,0};
 
 static __force_inline uint16_t __not_in_flash_func(READ_ADDR)()
 {
@@ -986,7 +992,26 @@ bool bDir = false;
 
 //void RkSd_main();
 auto_init_mutex(sd_mutex);
-recursive_mutex_t sd_mutex2;
+static recursive_mutex_t sd_mutex2;
+
+#if 1
+recursive_mutex_t *  get_sd_mutex()
+{
+  return &sd_mutex2;
+}
+void MTX_ENTER()
+{
+  recursive_mutex_enter_blocking(&sd_mutex2);
+}
+bool MTX_TRY_ENTER()
+{
+  recursive_mutex_try_enter(&sd_mutex2, NULL);
+}
+void MTX_EXIT()
+{
+  recursive_mutex_exit(&sd_mutex2);
+}
+#endif
 
 extern volatile uint16_t addr;
 extern volatile bool bStopRomEmu;
@@ -998,7 +1023,7 @@ void __not_in_flash_func(EmulateRom)()
 
 
 int res = 0;
-void main_sd()
+void  __not_in_flash_func(main_sd)()
 {
   DATA_IN();
   LedOn();

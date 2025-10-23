@@ -82,19 +82,19 @@ s1:
 
 .program dmaRead
 .define public nDACK_PIN 5
-.define public nIOR_PIN  7
+.define public nIOR_PIN  3
 .side_set 1 opt
 .wrap_target
   mov osr, null       ; change CD0-7 pindirs to inputs
   out pindirs, 8 side 1
-  pull block
-pullLoop2:
-  ;jmp pin, pullLoop2 ; nDACK_PIN
+
+  wait 1 gpio nDACK_PIN ; wait for nDACK_PIN to go inactive (high)
   wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
   wait 0 gpio nIOR_PIN  ; wait for nIOR to go active (low)
+  pull block
   out pins, 8           ; send the data byte
   out pindirs, 8 side 0 ; set up CD0-7 as outputs
-  wait 1 gpio nIOR_PIN  ; wait for nIOR to go inactive (high)
+  wait 1 gpio nIOR_PIN  ; wait for nIOR_PIN to go inactive (high)
 .wrap
 
 ; -----------------------------------------------------------------------------
@@ -118,13 +118,11 @@ pullLoop2:
 
 .program dmaWrite
 .define public nDACK_PIN 5
-.define public nIOW_PIN  6
-
-loop:
-  ;wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
+.define public nIOW_PIN  0
+  wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
   wait 0 gpio nIOW_PIN  ; wait for nIOW to go active (low)
-  jmp pin, loop
   wait 1 gpio nIOW_PIN  ; wait for nIOW high (inactive)
-  in pins, 16                ; grab the data CD0-7 and auto-push
+  in pins, 8                ; grab the data CD0-7 and auto-push
+  wait 1 gpio nDACK_PIN ; wait for nDACK_PIN to go inactive (high)
 .wrap
 

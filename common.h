@@ -11,7 +11,7 @@
 #include <pico/sync.h>
 
 #define CONST
-#define USE_DMA 0
+#define USE_DMA 1
 #define USE_ETHERNET 1
 #define USE_SERIAL_DEBUG 1
 
@@ -22,14 +22,20 @@ typedef uint32_t  DWORD;
 #ifdef __cplusplus
 extern "C" {
 #endif
+#if 0
 extern recursive_mutex_t sd_mutex2;
-inline recursive_mutex_t* get_sd_mutex()
+inline  recursive_mutex_t *  get_sd_mutex()
 {
   return &sd_mutex2;
 }
 #define MTX_ENTER() recursive_mutex_enter_blocking(get_sd_mutex())
 #define MTX_EXIT() recursive_mutex_exit(get_sd_mutex())
-
+#else
+extern  recursive_mutex_t *  get_sd_mutex();
+extern void MTX_ENTER();
+extern bool MTX_TRY_ENTER();
+extern void MTX_EXIT();
+#endif
 extern volatile uint8_t v55_buf[4];
 #ifdef __cplusplus
 }

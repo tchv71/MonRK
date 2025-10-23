@@ -20,7 +20,7 @@
 #if (DEVICE_BOARD_NAME == W55RP20_EVB_PICO) || defined(USE_SPI_PIO)
 #include "wiznet_spi_pio.h"
 #endif
-
+#include "../../../../common.h"
 /**
  * ----------------------------------------------------------------------------------------------------
  * Macros
@@ -162,12 +162,14 @@ static void wizchip_write_burst(uint8_t *pBuf, uint16_t len)
 
 static void wizchip_critical_section_lock(void)
 {
-    critical_section_enter_blocking(&g_wizchip_cri_sec);
+    //critical_section_enter_blocking(&g_wizchip_cri_sec);
+    MTX_ENTER();
 }
 
 static void wizchip_critical_section_unlock(void)
 {
-    critical_section_exit(&g_wizchip_cri_sec);
+    //critical_section_exit(&g_wizchip_cri_sec);
+    MTX_EXIT();
 }
 
 void wizchip_spi_initialize(void)

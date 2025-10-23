@@ -15,16 +15,16 @@
 #define BAUD (1000*1000)
 #define PIN_DRQ   4
 #define PIN_nDACK 5
-#define PIN_nIOW  6
-#define PIN_nIOR  7
+#define PIN_nIOW  0
+#define PIN_nIOR  3
 #define PIN_DIR   8
 #define PIN_LED   25
 
 #define PIN_A0 28
 #define PIN_A1 29
 #define PIN_nCS2 23
-#define PIN_nWR PIN_nIOW
-#define PIN_nRD PIN_nIOR
+#define PIN_nWR 6
+#define PIN_nRD 7
 
 enum
 {

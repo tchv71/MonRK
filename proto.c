@@ -10,13 +10,13 @@ void RkSd_Main();
 extern const uint dmaRomSm;
 
 
-#if !USE_DMA
+#if USE_DMA
 enum DMA_MODE { DM_NONE = 0, DM_SEND, DM_RECEIVE} dm_mode;
 BYTE cmd_buf_send[32];
 BYTE cmd_buf_recv[32];
 BYTE* cmd_buf_send_ptr = cmd_buf_send;
 BYTE* cmd_buf_recv_ptr = cmd_buf_recv;
-
+#else
 void DATA_BUS_OUT()
 {}
 
@@ -60,15 +60,24 @@ void recvStartNoDma()
 
 WORD l;
 #else
+extern volatile bool bEvent;
 void  inline __time_critical_func(wait)()
 {
-  recursive_mutex_enter_blocking(get_sd_mutex());
+#if 1
+  //MTX_ENTER();
   // Ждем перепад 1->0 A5
   while ((v55_buf[1] & 0x20) == 0)
     WAIT_RW_BYTE();
   while ((v55_buf[1] & 0x20) != 0)
     WAIT_RW_BYTE();
-    recursive_mutex_exit(get_sd_mutex());
+  //MTX_EXIT();
+#else
+  do
+  {
+    __wfe();
+  } while (!bEvent);
+  bEvent = false;
+#endif
 }
 #endif
 
