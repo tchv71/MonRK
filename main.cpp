@@ -183,7 +183,7 @@ void dmaPioInit()
     sm_config_set_jmp_pin(&writeConfig, PIN_nDACK);
     sm_config_set_fifo_join(&writeConfig, PIO_FIFO_JOIN_RX);
     sm_config_set_in_pins(&writeConfig, PIN_CD7);
-    sm_config_set_in_shift(&writeConfig, true, true, 32); // R shift, autopush @ 16 bits
+    sm_config_set_in_shift(&writeConfig, false, true, 16); // L shift, autopush @ 16 bits
     sm_config_set_clkdiv(&writeConfig, 1.0f);
 
     pio_sm_init(DMA_PIO, dmaWriteSm, dmaWriteProgOffset, &writeConfig);

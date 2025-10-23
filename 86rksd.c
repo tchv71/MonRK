@@ -154,7 +154,7 @@ void readInt(char rks)
     sendBin((BYTE *)&readedLength, 2);
 #if USE_DMA
     sendFlush();
-    sleep_ms(10);
+    //sleep_ms(10);
     dma_send(wptr, readedLength);
     //BYTE i=0;//
 #else
@@ -919,11 +919,11 @@ void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
 #if INTS_OFF
   uint32_t ints = save_and_disable_interrupts();
 #endif
-  uint32_t *ptr1 = (uint32_t*)ptr;
-  len /= 4;
+  //uint16_t *ptr1 = (uint16_t*)ptr;
+  //len /= 2;
   do
   {
-    *ptr1++ = pio_sm_get_blocking(DMA_PIO, dmaWriteSm);// & 0xFF;
+    *ptr++ = pio_sm_get_blocking(DMA_PIO, dmaWriteSm) & 0xFF;
   } while (--len);
 #if INTS_OFF
   restore_interrupts(ints);
