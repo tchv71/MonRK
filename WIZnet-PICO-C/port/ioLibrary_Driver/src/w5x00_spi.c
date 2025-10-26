@@ -162,13 +162,13 @@ static void wizchip_write_burst(uint8_t *pBuf, uint16_t len)
 
 static void wizchip_critical_section_lock(void)
 {
-    critical_section_enter_blocking(&g_wizchip_cri_sec);
+    //critical_section_enter_blocking(&g_wizchip_cri_sec);
     //MTX_ENTER();
 }
 
 static void wizchip_critical_section_unlock(void)
 {
-    critical_section_exit(&g_wizchip_cri_sec);
+    //critical_section_exit(&g_wizchip_cri_sec);
     //MTX_EXIT();
 }
 

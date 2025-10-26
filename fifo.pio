@@ -94,7 +94,7 @@ s1:
   pull block
   out pins, 8           ; send the data byte
   out pindirs, 8 side 0 ; set up CD0-7 as outputs
-  wait 1 gpio nIOR_PIN  ; wait for nIOR_PIN to go inactive (high)
+  wait 1 gpio nIOR_PIN [4] ; wait for nIOR_PIN to go inactive (high)
 .wrap
 
 ; -----------------------------------------------------------------------------
