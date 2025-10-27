@@ -125,7 +125,7 @@ void readInt(char rks)
 
       // Посылаем адрес загрузки
       sendByte(STA_OK_RKS);
-      sendBin(buf, 2);
+      sendWord(*(WORD*)buf);
 #if !USE_DMA
       sendByte (STA_WAIT);
 #endif
@@ -151,12 +151,9 @@ void readInt(char rks)
 
     // Отправляем блок
     sendByte(STA_OK_BLOCK);
-    sendBin((BYTE *)&readedLength, 2);
+    sendWord(readedLength);
 #if USE_DMA
-    sendFlush();
-    //sleep_ms(10);
     dma_send(wptr, readedLength);
-    //BYTE i=0;//
 #else
     sendBin (wptr, readedLength);
     sendByte (STA_WAIT);
@@ -178,12 +175,9 @@ void cmd_ver()
 
   // Версия + Производитель
   {
-    flash char *ver = "V1.0 10-05-2014 ";
+    flash char *ver = "V1.1 (DMA SIMPLE)";
     sendBinf(ver, 16);
   }
-#if USE_DMA
-  sendFlush();
-#endif
 }
 
 /*******************************************************************************
@@ -196,7 +190,7 @@ void cmd_boot_exec()
 #if !USE_DMA
     const char *bootSdbiosRk = "boot/sdbios.rk";
 #else
-    const char *bootSdbiosRk = "boot/sdbiosd.rkl";
+    const char *bootSdbiosRk = "boot/sdbiosds.rkl";
 #endif
     if (buf[0] == 0)
       strcpy((char*) buf, /* (const char*) (nCS_GPIO_Port->IDR & nCS_Pin) ?  "boota/sdbios.rk" :  */bootSdbiosRk);
@@ -320,7 +314,6 @@ void cmd_find()
     sendBin ((BYTE*) &info, sizeof(info));
     sendByte (STA_WAIT);
 #else
-    sendFlush();
     dma_send((BYTE*) &info, sizeof(info));
 #endif
   }
@@ -841,9 +834,6 @@ BYTE RkSd_Loop()
       // Вывод ошибки
       if (lastError && c != STA_START) 
         sendStart(lastError);
-#if USE_DMA
-      sendFlush();
-#endif
     }
 
 #if 0// !USE_DMA
@@ -867,21 +857,22 @@ const uint fifoWrite2Sm = 1;
 extern int res;
 
 #define INTS_OFF 0
-void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
+void __not_in_flash_func(dma_send)(const BYTE *ptr, WORD len)
 {
 #if 1
   gpio_init(PIN_DRQ);
   gpio_put(PIN_DRQ, 1);
   gpio_set_dir(PIN_DRQ, GPIO_OUT);
-  pio_gpio_init(FIFO_PIO, PIN_DIR);
-  pio_sm_drain_tx_fifo(FIFO_PIO, dmaReadSm);
-  pio_sm_restart(FIFO_PIO, dmaReadSm);
+   //pio_sm_drain_tx_fifo(FIFO_PIO, dmaReadSm);
+  //pio_sm_restart(FIFO_PIO, dmaReadSm);
 #if INTS_OFF
   uint32_t ints = save_and_disable_interrupts();
 #endif
+  uint32_t val;
   do
   {
-    pio_sm_put_blocking(FIFO_PIO, dmaReadSm, *ptr++ | (0xFF << 8));
+    val = *ptr++ | (0xFF << 8);
+    pio_sm_put_blocking(FIFO_PIO, dmaReadSm, val);
   } while (--len);
 #if INTS_OFF
   restore_interrupts(ints);
@@ -912,7 +903,7 @@ void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
 void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
 {
 #if 1
-  uint mask = DRQ_MASK | DIR_MASK;
+  uint mask = DRQ_MASK/*  | DIR_MASK */;
   gpio_init_mask(mask);
   gpio_put_masked(mask, mask);
   gpio_set_dir_out_masked(mask);

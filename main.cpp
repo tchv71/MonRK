@@ -193,6 +193,10 @@ void dmaPioInit()
     if (dmaReadProgOffset<0)
         panic("Failed add dmaReadProgram");
 
+    pio_gpio_init(FIFO_PIO, PIN_DIR);
+    pio_sm_set_pins_with_mask(FIFO_PIO, dmaReadSm, DIR_MASK, DIR_MASK);
+    pio_sm_set_pindirs_with_mask(FIFO_PIO, dmaReadSm, DIR_MASK, DIR_MASK);
+
     pio_sm_config readDmaConfig = dmaRead_program_get_default_config(dmaReadProgOffset);
     //sm_config_set_in_pins(&readDmaConfig, PIN_CSR);
     sm_config_set_jmp_pin(&readDmaConfig, PIN_nDACK);
@@ -293,8 +297,8 @@ void setup()
 int main()
 {
     vreg_set_voltage(VREG_VOLTAGE_1_30);
-    //set_sys_clock_pll(PICO_CLOCK_PLL, PICO_CLOCK_PLL_DIV1, PICO_CLOCK_PLL_DIV2); // 252000
-    set_sys_clock_khz(320000, false);
+    set_sys_clock_pll(PICO_CLOCK_PLL, PICO_CLOCK_PLL_DIV1, PICO_CLOCK_PLL_DIV2); // 252000
+    //set_sys_clock_khz(320000, false);
     recursive_mutex_init(get_sd_mutex());
     stdio_init_all();
     // stdio_set_translate_crlf(&stdio_usb, false);
