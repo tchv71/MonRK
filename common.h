@@ -31,10 +31,11 @@ inline  recursive_mutex_t *  get_sd_mutex()
 #define MTX_ENTER() recursive_mutex_enter_blocking(get_sd_mutex())
 #define MTX_EXIT() recursive_mutex_exit(get_sd_mutex())
 #else
-extern  recursive_mutex_t *  get_sd_mutex();
-extern void MTX_ENTER();
-extern bool MTX_TRY_ENTER();
-extern void MTX_EXIT();
+extern recursive_mutex_t sd_mutex2;
+#define get_sd_mutex() &sd_mutex2
+#define MTX_ENTER() recursive_mutex_enter_blocking(&sd_mutex2)
+#define MTX_TRY_ENTER() recursive_mutex_try_enter(&sd_mutex2, NULL)
+#define MTX_EXIT() recursive_mutex_exit(&sd_mutex2)
 #endif
 extern volatile uint8_t v55_buf[4];
 #ifdef __cplusplus

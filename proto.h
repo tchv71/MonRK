@@ -15,15 +15,15 @@ extern critical_section_t g_wizchip_cri_sec;
 
 void  __time_critical_func(wait)();
 #endif
-void __not_in_flash_func(sendStart)(BYTE c); 
-void __not_in_flash_func(sendByte)(BYTE c);
-void __not_in_flash_func(sendWord)(WORD w);
+void sendStart(BYTE c); 
+void sendByte(BYTE c);
+void sendWord(WORD w);
 #define recvStart()
-//void __not_in_flash_func(recvStart)();
-BYTE __not_in_flash_func(wrecv)();
+BYTE recvByte();
+WORD recvWord();
 #if USE_DMA
-void __not_in_flash_func(dma_receive)(BYTE* ptr, WORD len);
-void __not_in_flash_func(dma_send)(const BYTE* ptr, WORD len);
+void dma_receive(BYTE* ptr, WORD len);
+void dma_send(const BYTE* ptr, WORD len);
 #define recvStartNoDma()
 #endif
 /**

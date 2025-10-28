@@ -76,7 +76,7 @@ void __not_in_flash_func(recvStart)()
 #define recvStart()
 #endif
 
-BYTE __not_in_flash_func(wrecv)()
+BYTE __not_in_flash_func(recvByte)()
 {
 #if !USE_DMA
   wait ();
@@ -85,6 +85,18 @@ BYTE __not_in_flash_func(wrecv)()
   BYTE c;
   dma_receive(&c, 1);
    return c;
+#endif
+}
+
+WORD __not_in_flash_func(recvWord)()
+{
+#if !USE_DMA
+  WORD w = wrecv();
+  return w | ((WORD)(wrecv()))<<8;
+#else
+  WORD w;
+  dma_receive((BYTE*)&w, 2);
+  return w;
 #endif
 }
 
@@ -109,5 +121,87 @@ void __not_in_flash_func(sendWord)(WORD w)
   static WORD w1;
   w1 = w;
   dma_send((const BYTE*)&w1, 2);
+#endif
+}
+
+
+extern const uint dmaWriteSm;
+// const uint dmaRomSm = 2;
+// const uint dmaReadSm = 1;
+// const uint fifoReadSm = 0;
+// const uint fifoWrite2Sm = 1;
+
+#define INTS_OFF 0
+void __not_in_flash_func(dma_send)(const BYTE *ptr, WORD len)
+{
+#if 1
+  gpio_put(PIN_DRQ, 1);
+#if INTS_OFF
+  uint32_t ints = save_and_disable_interrupts();
+#endif
+  uint32_t val;
+  do
+  {
+    val = *ptr++ | (0xFF << 8);
+    pio_sm_put_blocking(FIFO_PIO, dmaReadSm, val);
+  } while (--len);
+#if INTS_OFF
+  restore_interrupts(ints);
+#endif
+  while (!pio_sm_is_tx_fifo_empty(FIFO_PIO, dmaReadSm)) ;
+  while (gpio_get(PIN_nDACK) == 0) ;
+  gpio_put(PIN_DRQ, 0);
+#else
+  gpio_init(PIN_DRQ);
+  gpio_put(PIN_DRQ, 1);
+  gpio_set_dir(PIN_DRQ, GPIO_OUT);
+  uint32_t ints = save_and_disable_interrupts();
+  do
+  {
+    DATA_IN();
+    while (gpio_get_all() & (nIOR_MASK | nDACK_MASK))
+      ;
+    DATA_OUT();
+    WRITE_DATA(*ptr++); // PORTD = *ptr++;
+    while (gpio_get(nIOR) == 0)
+      ;
+  } while (--len);
+  gpio_put(PIN_DRQ, 0);
+  restore_interrupts(ints);
+#endif
+}
+
+void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
+{
+#if 1
+  gpio_put(PIN_DRQ, 1);
+#if INTS_OFF
+  uint32_t ints = save_and_disable_interrupts();
+#endif
+  //uint16_t *ptr1 = (uint16_t*)ptr;
+  //len /= 2;
+  do
+  {
+    *ptr++ = pio_sm_get_blocking(DMA_PIO, dmaWriteSm) & 0xFF;
+  } while (--len);
+#if INTS_OFF
+  restore_interrupts(ints);
+#endif
+  gpio_put(PIN_DRQ, 0);
+  while (gpio_get(PIN_nDACK) == 0) ;
+#else
+  DATA_IN();
+  gpio_put(PIN_DRQ, 1);
+  uint32_t ints = save_and_disable_interrupts();
+  do
+  {
+    while (gpio_get_all() & (nIOW_MASK | nDACK_MASK))
+      ;
+    while (gpio_get(nIOW) == 0)
+      ;
+    *ptr++ = READ_DATA();
+  } while (--len);
+  gpio_put(DRQ, 0);
+  restore_interrupts(ints);
 #endif
 }
