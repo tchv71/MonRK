@@ -198,9 +198,10 @@ void cmd_boot_exec()
 
   // Открываем файл
   MTX_ENTER();
-  if (fs_open())
-    return;
+  BYTE res = fs_open();
   MTX_EXIT();
+  if (res)
+    return;
 
   // Максимальный размер файла
   readLength = 0xFFFF;
@@ -283,9 +284,10 @@ void cmd_find()
   if (buf[0] != ':')
   {
     MTX_ENTER();
-    if (fs_opendir())
-      return;
+    BYTE res = fs_opendir();
     MTX_EXIT();
+    if (res)
+      return;
   }
   // pio_gpio_init(FIFO_PIO, PIN_DIR);
   // pio_sm_set_pins_with_mask(FIFO_PIO, dmaReadSm, DIR_MASK, DIR_MASK);
@@ -298,14 +300,15 @@ void cmd_find()
     BYTE res = fs_readdir();
     if (res)
     {
-      lastError = ERR_DISK_ERR;
       MTX_EXIT();
+      lastError = ERR_DISK_ERR;
       return;
     }
 
     /* Конец */
     if (FS_DIRENTRY[0] == 0)
     {
+      MTX_EXIT();
       sendByte(STA_OK_CMD);
       return;
     }
@@ -422,28 +425,28 @@ void cmd_lseek()
   if (mode == 100)
   {
     if (fs_getfilesize())
-      return;
+      goto abort;
   }
 
   // Размер диска
   else if (mode == 101)
   {
     if (fs_gettotal())
-      return;
+      goto abort;
   }
 
   // Свободное место на диске
   else if (mode == 102)
   {
     if (fs_getfree())
-      return;
+      goto abort;
   }
 
   else
   {
     /* Устаналиваем смещение. fs_tmp сохраняется */
     if (fs_lseek(off, mode))
-      return;
+      goto abort;
   }
   MTX_EXIT();
 
@@ -453,6 +456,10 @@ void cmd_lseek()
   sendWord(fs_tmp & 0xFFFF);
   sendWord(fs_tmp >> 16);
   lastError = 0; // На всякий случай, результат уже передан
+  return;
+abort:
+  lastError = ERR_DISK_ERR;
+  MTX_EXIT();
 }
 
 /*******************************************************************************
@@ -939,7 +946,8 @@ void  __not_in_flash_func(main_sd)()
     error();
   multicore_fifo_push_blocking(0);
   {
-    mutex_enter_blocking(&sd_mutex);
+    //mutex_enter_blocking(&sd_mutex);
+    MTX_ENTER();
     strcpy(buf, "boot/boot.rk");
     if (fs_open())
       error();
@@ -975,7 +983,8 @@ void  __not_in_flash_func(main_sd)()
     }
 #endif
     }
-    mutex_exit(&sd_mutex);
+    //mutex_exit(&sd_mutex);
+    MTX_EXIT();
   }
   //while (true) ;
 #if !USE_DMA
