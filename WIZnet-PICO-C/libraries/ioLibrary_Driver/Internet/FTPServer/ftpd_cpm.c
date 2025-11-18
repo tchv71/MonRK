@@ -517,7 +517,8 @@ long ftpd_cpm_run(uint8_t* dbuf)
 			unmount_drive();
 			mount_drive();
 			char cpmname[2 + 8 + 1 + 3 + 1]; /* 00foobarxy.zzy\0 */
-			toCpmName(cpmname, ftp.filename);
+			char* fname = strrchr(ftp.filename, '/') + 1;
+			toCpmName(cpmname, fname);
 			cpmUnlink(&root, cpmname);
 			struct cpmInode ino;
 			ftp.fr = cpmCreat(&root, cpmname, &ino, 0666); // f_open(&(ftp.fil), (const char *)ftp.filename, FA_CREATE_ALWAYS | FA_WRITE);
@@ -592,7 +593,7 @@ long ftpd_cpm_run(uint8_t* dbuf)
 #endif
 				ftp.fr = cpmClose(&file); // f_close(&(ftp.fil));
 				int nRes = cpmSync(&drive);
-				//unmount_drive();
+				unmount_drive();
 			}
 			else
 			{
@@ -720,11 +721,14 @@ long ftpd_cpm_run(uint8_t* dbuf)
 void toCpmName(char cpmname[15], const char* filename)
 {
 	strcpy(cpmname, "00");
-	const char* pDot = strchr(filename, '.');
-	int len = pDot ? pDot - filename : strlen(filename);
+	char fname[13];
+	char *fname2 = strrchr(filename, '/') + 1;
+	strcpy(fname, fname2);
+	char* pDot = strchr(fname, '.');
+	int len = pDot ? pDot - fname : strlen(fname);
 	if (len>8)
 		len = 8;
-	strncpy(cpmname + 2, filename, len);
+	strncpy(cpmname + 2, fname, len);
 	cpmname[2 + len] = 0;
 	if (pDot)
 	{
@@ -1016,7 +1020,7 @@ long proc_ftpd_cpm(char* ftp_buf)
 			else
 				sprintf(ftp.filename, "%s/%s", ftp.workingdir, arg);
 			strcpy(buf, ftp.filename[0] == '/' ? ftp.filename + 1 : ftp.filename);
-			slen = get_filesize_cpm("", buf);
+			slen = get_filesize_cpm("", arg/* buf */);
 			if (slen > 0)
 				slen = sprintf(sendbuf, "213 %d\r\n", slen);
 			else

@@ -13,6 +13,7 @@
 
 #define _SPI spi1
 #define BAUD (1000*1000)
+#define PIN_nWAIT 2
 #define PIN_DRQ   4
 #define PIN_nDACK 5
 #define PIN_nIOW  0
@@ -41,6 +42,7 @@ enum
 #define nWR_MASK  (1 << PIN_nWR)
 #define nRD_MASK  (1 << PIN_nRD)
 
+#define nWAIT_MASK (1 << PIN_nWAIT)
 #define DRQ_MASK   (1 << PIN_DRQ)
 #define nDACK_MASK (1 << PIN_nDACK)
 #define nIOW_MASK  (1 << PIN_nIOW)
