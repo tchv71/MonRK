@@ -38,7 +38,7 @@
 #define ERR_DATETIME 0x50
 #define STA_OK_BLOCK 0x4F
 
-__attribute__((aligned(4))) BYTE buf[1024+16];
+__attribute__((aligned(4))) BYTE buf[1024+512];
 __attribute__((aligned(4))) BYTE rom[128];
 #define flash
 

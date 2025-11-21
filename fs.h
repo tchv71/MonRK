@@ -38,7 +38,7 @@ extern BYTE rom[128];
 
 /* Work buffer for filesystem */
 /* Буфер для работы файловой системы */
-extern BYTE buf[1024+16];
+extern BYTE buf[];
 
 /* Error */
 /* Ошибки файловой системы */

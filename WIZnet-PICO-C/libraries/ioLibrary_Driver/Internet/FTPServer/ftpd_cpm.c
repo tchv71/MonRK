@@ -461,11 +461,6 @@ long ftpd_cpm_run(uint8_t* dbuf)
 			printf("filename to retrieve : %s %d\r\n", ftp.filename, (int)strlen(ftp.filename));
 #endif
 			mount_drive();
-			char* rchr = strrchr(ftp.filename, '/');
-			if (rchr)
-			{
-				strcpy(ftp.filename, rchr+1);
-			}
 			strcpy(buf, ftp.filename[0] == '/' ? ftp.filename + 1 : ftp.filename);
 			//ftp.fr = fs_open();
 			struct cpmInode ino;
@@ -517,8 +512,7 @@ long ftpd_cpm_run(uint8_t* dbuf)
 			unmount_drive();
 			mount_drive();
 			char cpmname[2 + 8 + 1 + 3 + 1]; /* 00foobarxy.zzy\0 */
-			char* fname = strrchr(ftp.filename, '/') + 1;
-			toCpmName(cpmname, fname);
+			toCpmName(cpmname, ftp.filename);
 			cpmUnlink(&root, cpmname);
 			struct cpmInode ino;
 			ftp.fr = cpmCreat(&root, cpmname, &ino, 0666); // f_open(&(ftp.fil), (const char *)ftp.filename, FA_CREATE_ALWAYS | FA_WRITE);
