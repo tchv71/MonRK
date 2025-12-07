@@ -1,4 +1,5 @@
-1. Чтение/запись SD - карты
+Прошивка контроллера для Пальмиры на Raspberry PI Pico.
+1. Чтение/запись SD - карты. Обмен через DMA по шине Пальмиры. Программный интерфейс эквивалентен https://github.com/alemorf/retro_computers/tree/master/Radio-86RK/myextensions/sd_controller
 2. Реализация USB интерфейса на Raspberry Pi Pico. По функциональности полностью эквивалентна http://radio86rk.pbworks.com/w/page/134476497/rk86-2018-usb. Второе ядро занято чтением SD-карточки и передачей на РК через DMA
 3. Встроенные ftp-серверы для SD и образов CP/M дисков. Чтение/запись SD (FAT32) и дисков CP/M по сети.
    
