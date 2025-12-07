@@ -428,6 +428,7 @@ long ftpd_cpm_run(uint8_t* dbuf)
 #if defined(_FTP_DEBUG_)
 			printf("previous size: %d\r\n", size);
 #endif
+			//fs_swap();
 			mount_drive();
 			scan_files_cpm(ftp.workingdir, dbuf, (int*)&size, strlen(ftp.filename)>0 ? ftp.filename : NULL);
 #if defined(_FTP_DEBUG_)
@@ -453,6 +454,7 @@ long ftpd_cpm_run(uint8_t* dbuf)
 			close(DATA_SOCK_CPM);
 			size = sprintf(dbuf, "226 Successfully transferred \"%s\"\r\n", ftp.workingdir);
 			send(CTRL_SOCK_CPM, dbuf, size);
+			//fs_swap();	
 			break;
 
 		case RETR_CMD:
@@ -460,6 +462,7 @@ long ftpd_cpm_run(uint8_t* dbuf)
 #if defined(_FTP_DEBUG_)
 			printf("filename to retrieve : %s %d\r\n", ftp.filename, (int)strlen(ftp.filename));
 #endif
+			//fs_swap();
 			mount_drive();
 			strcpy(buf, ftp.filename[0] == '/' ? ftp.filename + 1 : ftp.filename);
 			//ftp.fr = fs_open();
@@ -501,6 +504,8 @@ long ftpd_cpm_run(uint8_t* dbuf)
 			close(DATA_SOCK_CPM);
 			size = sprintf(dbuf, "226 Successfully transferred \"%s\"\r\n", ftp.filename);
 			send(CTRL_SOCK_CPM, dbuf, size);
+			//fs_swap();
+
 		}
 		break;
 
@@ -509,12 +514,13 @@ long ftpd_cpm_run(uint8_t* dbuf)
 #if defined(_FTP_DEBUG_)
 			printf("filename to store : %s %d\r\n", ftp.filename, (int)strlen(ftp.filename));
 #endif
+			//fs_swap();
 			unmount_drive();
 			mount_drive();
 			char cpmname[2 + 8 + 1 + 3 + 1]; /* 00foobarxy.zzy\0 */
 			toCpmName(cpmname, ftp.filename);
 			cpmUnlink(&root, cpmname);
-			struct cpmInode ino;
+			static struct cpmInode ino;
 			ftp.fr = cpmCreat(&root, cpmname, &ino, 0666); // f_open(&(ftp.fil), (const char *)ftp.filename, FA_CREATE_ALWAYS | FA_WRITE);
 			// print_filedsc(&(ftp.fil));
 			if (ftp.fr == FR_OK)
@@ -522,7 +528,7 @@ long ftpd_cpm_run(uint8_t* dbuf)
 #if defined(_FTP_DEBUG_)
 				printf("f_open return FR_OK\r\n");
 #endif
-				struct cpmFile file;
+				static struct cpmFile file;
 				cpmOpen(&ino, &file, O_WRONLY);
 				while (1)
 				{
@@ -600,7 +606,7 @@ long ftpd_cpm_run(uint8_t* dbuf)
 				send(CTRL_SOCK_CPM, dbuf, size);
 				break;
 			}
-
+           	//fs_swap();
 			// fno.fdate = (WORD)(((current_year - 1980) << 9) | (current_month << 5) | current_day);
 			// fno.ftime = (WORD)((current_hour << 11) | (current_min << 5) | (current_sec >> 1));
 			// f_utime((const char *)ftp.filename, &fno);

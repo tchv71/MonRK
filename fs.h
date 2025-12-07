@@ -87,6 +87,9 @@ BYTE fs_delete();                                /* Удалить файл ил
 BYTE fs_open0(BYTE what);                        /* Открыть/создать файл или папку, имя в buf. Open/create file or foder, name in buf */
 BYTE fs_move0();                                 /* Переместить файл/папку. Move file or folder, source file must been opened, destination name in buf */
 //BYTE fs_move(const char* from, const char* to);  /* Переместить файл/папку. Move file or folder. */
+// mode:    0 - absolute
+//          1 - from file pointer
+//          2 - from file end
 BYTE fs_lseek(DWORD off, BYTE mode);             /* Установить указатель чтения/записи файла, увеличивает размер файла. / Set file pointer, enlarge file size. */
 BYTE fs_tell();                                  /* Получить указатель чтения/записи файла в fs_tmp / Get file pointer in fs_tmp. */
 BYTE fs_getfilesize();                           /* Получить размер файла / Get file size. */
