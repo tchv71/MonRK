@@ -38,21 +38,22 @@
 #define ERR_DATETIME 0x50
 #define STA_OK_BLOCK 0x4F
 
-__attribute__((aligned(4))) BYTE buf[1024+16];
+__attribute__((aligned(4))) BYTE buf[1024+512];
 __attribute__((aligned(4))) BYTE rom[128];
 #define flash
 
 /*******************************************************************************
  * Для удобства                                                                 *
  *******************************************************************************/
-
+#if !USE_DMA
 void recvBin(BYTE *d, WORD l)
 {
   for (; l; --l)
   {
-    *d++ = wrecv();
+    *d++ = recvByte();
   }
 }
+#endif
 
 void recvString()
 {
@@ -60,7 +61,7 @@ void recvString()
   BYTE *p = buf;
   do
   {
-    c = wrecv();
+    c = recvByte();
     if (p != buf + FS_MAXFILE)
       *p++ = c;
     else
@@ -125,7 +126,7 @@ void readInt(char rks)
 
       // Посылаем адрес загрузки
       sendByte(STA_OK_RKS);
-      sendBin(buf, 2);
+      sendWord(*(WORD*)buf);
 #if !USE_DMA
       sendByte (STA_WAIT);
 #endif
@@ -151,12 +152,9 @@ void readInt(char rks)
 
     // Отправляем блок
     sendByte(STA_OK_BLOCK);
-    sendBin((BYTE *)&readedLength, 2);
+    sendWord(readedLength);
 #if USE_DMA
-    sendFlush();
-    //sleep_ms(10);
     dma_send(wptr, readedLength);
-    //BYTE i=0;//
 #else
     sendBin (wptr, readedLength);
     sendByte (STA_WAIT);
@@ -165,7 +163,7 @@ void readInt(char rks)
 
   // Если все ОК
   if (!lastError)
-    lastError = STA_OK_READ;
+    sendStart(STA_OK_READ);
 }
 
 /*******************************************************************************
@@ -178,12 +176,9 @@ void cmd_ver()
 
   // Версия + Производитель
   {
-    flash char *ver = "V1.0 10-05-2014 ";
+    flash char *ver = "V1.1 (DMA SIMPLE)";
     sendBinf(ver, 16);
   }
-#if USE_DMA
-  sendFlush();
-#endif
 }
 
 /*******************************************************************************
@@ -196,16 +191,17 @@ void cmd_boot_exec()
 #if !USE_DMA
     const char *bootSdbiosRk = "boot/sdbios.rk";
 #else
-    const char *bootSdbiosRk = "boot/sdbiosd.rkl";
+    const char *bootSdbiosRk = "boot/sdbiosds.rkl";
 #endif
     if (buf[0] == 0)
       strcpy((char*) buf, /* (const char*) (nCS_GPIO_Port->IDR & nCS_Pin) ?  "boota/sdbios.rk" :  */bootSdbiosRk);
 
   // Открываем файл
   MTX_ENTER();
-  if (fs_open())
-    return;
+  BYTE res = fs_open();
   MTX_EXIT();
+  if (res)
+    return;
 
   // Максимальный размер файла
   readLength = 0xFFFF;
@@ -273,8 +269,12 @@ void cmd_find()
   recvString();
 
   // Принимаем макс кол-во элементов
-  recvBin((BYTE *)&n, 2);
+  n = recvWord();
+  n = 1000;
 
+  // MTX_ENTER();
+  // sleep_ms(100);
+  // MTX_EXIT();
   // Режим передачи и подтверждение
   sendStart(STA_WAIT);
   if (lastError)
@@ -284,10 +284,14 @@ void cmd_find()
   if (buf[0] != ':')
   {
     MTX_ENTER();
-    if (fs_opendir())
-      return;
+    BYTE res = fs_opendir();
     MTX_EXIT();
+    if (res)
+      return;
   }
+  // pio_gpio_init(FIFO_PIO, PIN_DIR);
+  // pio_sm_set_pins_with_mask(FIFO_PIO, dmaReadSm, DIR_MASK, DIR_MASK);
+  // pio_sm_set_pindirs_with_mask(FIFO_PIO, dmaReadSm, DIR_MASK, DIR_MASK);
 
   for (; n; --n)
   {
@@ -297,13 +301,15 @@ void cmd_find()
     if (res)
     {
       MTX_EXIT();
+      lastError = ERR_DISK_ERR;
       return;
     }
 
     /* Конец */
     if (FS_DIRENTRY[0] == 0)
     {
-      lastError = STA_OK_CMD;
+      MTX_EXIT();
+      sendByte(STA_OK_CMD);
       return;
     }
 
@@ -320,7 +326,7 @@ void cmd_find()
     sendBin ((BYTE*) &info, sizeof(info));
     sendByte (STA_WAIT);
 #else
-    sendFlush();
+    //sendBin ((BYTE*) &info, sizeof(info));
     dma_send((BYTE*) &info, sizeof(info));
 #endif
   }
@@ -338,7 +344,7 @@ void cmd_open()
   BYTE mode;
 
   /* Принимаем режим */
-  mode = wrecv();
+  mode = recvByte();
 
   // Принимаем имя файла
   recvString();
@@ -371,7 +377,7 @@ void cmd_open()
   MTX_EXIT();
   // Ок
   if (!lastError)
-    lastError = STA_OK_CMD;
+    sendStart(STA_OK_CMD);
 }
 
 /*******************************************************************************
@@ -394,7 +400,7 @@ void cmd_move()
     fs_move0();
   MTX_EXIT();
   if (!lastError)
-    lastError = STA_OK_CMD;
+    sendStart(STA_OK_CMD);
 }
 
 /*******************************************************************************
@@ -407,8 +413,9 @@ void cmd_lseek()
   DWORD off = 0;
 
   // Принимаем режим и смещение
-  mode = wrecv();
-  recvBin((BYTE *)&off, 4);
+  mode = recvByte();
+  off = recvWord();
+  off |= recvWord() << 16;
 
   // Режим передачи и подтверждение
   sendStart(STA_WAIT);
@@ -418,35 +425,41 @@ void cmd_lseek()
   if (mode == 100)
   {
     if (fs_getfilesize())
-      return;
+      goto abort;
   }
 
   // Размер диска
   else if (mode == 101)
   {
     if (fs_gettotal())
-      return;
+      goto abort;
   }
 
   // Свободное место на диске
   else if (mode == 102)
   {
     if (fs_getfree())
-      return;
+      goto abort;
   }
 
   else
   {
     /* Устаналиваем смещение. fs_tmp сохраняется */
     if (fs_lseek(off, mode))
-      return;
+      goto abort;
   }
   MTX_EXIT();
 
   // Передаем результат
   sendByte(STA_OK_CMD);
-  sendBin((BYTE *)&fs_tmp, 4);
+  //sendBin((BYTE *)&fs_tmp, 4);
+  sendWord(fs_tmp & 0xFFFF);
+  sendWord(fs_tmp >> 16);
   lastError = 0; // На всякий случай, результат уже передан
+  return;
+abort:
+  lastError = ERR_DISK_ERR;
+  MTX_EXIT();
 }
 
 /*******************************************************************************
@@ -458,7 +471,7 @@ void cmd_read()
   DWORD s;
 
   // Длина
-  recvBin((BYTE *)&readLength, 2);
+  readLength = recvWord();
 
   // Режим передачи и подтверждение
   sendStart(STA_WAIT);
@@ -490,7 +503,7 @@ void cmd_read()
 void cmd_write()
 {
   // Аргументы
-  recvBin((BYTE *)&fs_wtotal, 2);
+  fs_wtotal = recvWord();
 
   // Ответ
   sendStart(STA_WAIT);
@@ -501,7 +514,7 @@ void cmd_write()
     MTX_ENTER();
     fs_write_eof();
     MTX_EXIT();
-    lastError = STA_OK_CMD;
+    sendStart(STA_OK_CMD);
     return;
   }
 
@@ -516,12 +529,11 @@ void cmd_write()
 
     // Принимаем от компьютера блок данных
     sendByte(STA_OK_WRITE);
-    sendBin((BYTE *)&fs_file_wlen, 2);
+    sendWord(fs_file_wlen);
 #if !USE_DMA
     recvStart();
     recvBin(fs_file_wbuf, fs_file_wlen);
 #else
-    recvStartNoDma();
     dma_receive(fs_file_wbuf, fs_file_wlen);
 #endif
     sendStart(STA_WAIT);
@@ -532,7 +544,7 @@ void cmd_write()
       return;
   } while (fs_wtotal);
 
-  lastError = STA_OK_CMD;
+  sendStart(STA_OK_CMD);
 }
 
 typedef struct
@@ -650,10 +662,10 @@ void cmd_set_date()
 {
   RTC_DateTypeDef sDate={0};
   //recvStart();
-  sDate.WeekDay = wrecv();
-  sDate.Month = wrecv();
-  sDate.Date = wrecv();
-  sDate.Year = wrecv();
+  sDate.WeekDay = recvByte();
+  sDate.Month = recvByte();
+  sDate.Date = recvByte();
+  sDate.Year = recvByte();
   sDate.WeekDay = Calendar_GetDayWeek(sDate);
 
   // Режим передачи и подтверждение
@@ -673,7 +685,7 @@ void cmd_set_date()
     return;
   }
   //send (STA_OK_CMD);
-  lastError = STA_OK_CMD;
+   sendStart(STA_OK_CMD);
 }
 
 /*******************************************************************************
@@ -705,11 +717,11 @@ void cmd_get_time()
 void cmd_set_time()
 {
   RTC_TimeTypeDef sTime={0};
-  sTime.Hours = wrecv();
-  sTime.Minutes = wrecv();
-  sTime.Seconds = wrecv();
-  sTime.SecondFraction = wrecv();
-  sTime.SubSeconds = wrecv();
+  sTime.Hours = recvByte();
+  sTime.Minutes = recvByte();
+  sTime.Seconds = recvByte();
+  sTime.SecondFraction = recvByte();
+  sTime.SubSeconds = recvByte();
   datetime_t t;
   if (!rtc_get_datetime(&t))
   {
@@ -725,7 +737,7 @@ void cmd_set_time()
     return;
   }
   //send (STA_OK_CMD);
-  lastError = STA_OK_CMD;
+  sendStart(STA_OK_CMD);
 }
 
 
@@ -758,6 +770,228 @@ void LedOn()
   gpio_put(PIN_LED, 1);
 }
 
+struct {
+uint8_t  WRITE_MODE;
+uint8_t  ARG_SELDISK;
+uint16_t ARG_TRACK;
+uint16_t ARG_SECTOR_128;
+} a;
+const uint16_t ARG_SEC_ON_TRK = 80;
+uint16_t ARG_SECTOR_512;
+uint8_t  NEW_COUNT;
+uint8_t  NEW_DISK;
+uint16_t NEW_TRACK;
+uint16_t NEW_SECTOR;
+int8_t   BUFFER_DISK = -1;
+uint16_t BUFFER_TRACK;
+uint16_t BUFFER_SECTOR;
+BYTE BUFFER[512];
+
+bool BUFFER_CHANGED = false;
+
+void cmd_bios_home()
+{
+  a.ARG_TRACK = 0;
+}
+
+void cmd_bios_sel_dsk()
+{
+  a.ARG_SELDISK = recvByte();
+}
+
+void cmd_bios_set_trk()
+{
+  a.ARG_TRACK = recvWord();
+}
+
+void  cmd_bios_set_sect()
+{
+  a.ARG_SECTOR_128 = recvByte();
+}
+
+bool OpenDiskImage()
+{
+  if (BUFFER_DISK != a.ARG_SELDISK)
+  {
+    char fname[] = "CPM/A.KDI";
+    fname[4] = 'A' + a.ARG_SELDISK;
+    strcpy(buf, fname);
+    if (fs_open() != 0)
+      return false;
+    BUFFER_DISK = a.ARG_SELDISK;
+  }
+  return true;
+}
+
+
+bool DiskSeek()
+{
+  //trk*1024*5*2/256
+  DWORD off = BUFFER_TRACK * 1024 * 5 * 2 + BUFFER_SECTOR * 512;
+  return fs_lseek(off, 0) == 0;
+}
+
+bool Write512()
+{
+  if (!OpenDiskImage() || !DiskSeek())
+    return false;
+  fs_wtotal = 512;
+  // Запись данных
+  do
+  {
+    MTX_ENTER();
+    BYTE res = fs_write_start();
+    MTX_EXIT();
+    if (res)
+      return false;
+    MTX_ENTER();
+    memcpy(fs_file_wbuf, BUFFER, 512);
+    res = fs_write_end();
+    MTX_EXIT();
+    if (res)
+      return false;
+  } while (fs_wtotal);
+  return true;
+}
+
+bool Read512()
+{
+  if (!OpenDiskImage() || !DiskSeek())
+    return false;
+  // Читаем блок
+  MTX_ENTER();
+  BYTE res = fs_read0(BUFFER, 512);
+  MTX_EXIT();
+  return res == 0;
+}
+
+bool SaveBuffer()
+{
+  BUFFER_CHANGED = false;
+  return Write512();
+}
+
+#define BW_READ true
+#define BW_WRITE false
+#define BW_READ_512 true
+#define BW_BLOCK_READ_512 false
+
+bool BufferWork(bool bRead, bool C);
+
+inline bool BiosRead()
+{
+  a.WRITE_MODE = 2;
+  return BufferWork(BW_READ, BW_READ_512);
+}
+
+bool BufferWork(bool bRead, bool C)
+{
+  ARG_SECTOR_512 = a.ARG_SECTOR_128 >> 2;
+  if (BUFFER_DISK != a.ARG_SELDISK || BUFFER_TRACK != a.ARG_TRACK || BUFFER_SECTOR != ARG_SECTOR_512)
+  {
+    if (BUFFER_DISK != -1 && BUFFER_CHANGED && !SaveBuffer())
+      return false;
+    BUFFER_CHANGED = false;
+    if (!OpenDiskImage())
+      return false;
+    BUFFER_DISK = a.ARG_SELDISK;
+    BUFFER_TRACK = a.ARG_TRACK;
+    BUFFER_SECTOR = ARG_SECTOR_512;
+    if (C && !Read512())
+    {
+      BUFFER_DISK = -1;
+      return false;
+    }
+  }
+  size_t addr = (a.ARG_SECTOR_128 & 3) * 128;
+  BUFFER_CHANGED = true;
+  sendByte(STA_OK_BLOCK);
+  if (bRead)
+  {
+#if USE_DMA
+    dma_send(BUFFER + addr, 128);
+#else
+    sendBin(BUFFER + addr, 128);
+    sendByte(STA_WAIT);
+#endif
+  }
+  else
+  {
+#if !USE_DMA
+    recvStart();
+    recvBin(BUFFER + addr, 128);
+#else
+    dma_receive(BUFFER + addr, 128);
+#endif
+  }
+  if (a.WRITE_MODE != 1)
+    return true;
+  return SaveBuffer();
+}
+
+void cmd_bios_rd_rect()
+{
+  NEW_COUNT = 0;
+  dma_receive(&a.ARG_SELDISK, 5);
+  bool res = BiosRead();
+  sendByte(res ? STA_OK_CMD : ERR_DISK_ERR);
+}
+
+bool CheckTrack()
+{
+  ++NEW_SECTOR;
+  if (NEW_SECTOR == ARG_SEC_ON_TRK)
+  {
+    NEW_SECTOR = 0;
+    ++NEW_TRACK;
+  }
+  return BufferWork(BW_WRITE, BW_BLOCK_READ_512);
+}
+
+inline bool ReadWrite512()
+{
+  NEW_COUNT = 0;
+  return BufferWork(BW_WRITE, BW_READ_512);
+}
+
+bool BiosWrite()
+{
+  if (a.WRITE_MODE == 2)
+  {
+    // Если это запись в блок файловой системы, который до этого не
+    // использовался, то взводится счетчик блокирующий чтение с дискеты
+    // BIOS_WRITE_FIRST_NEW
+    NEW_COUNT = 0xF;
+    NEW_DISK = a.ARG_SELDISK;
+    NEW_TRACK = a.ARG_TRACK;
+    NEW_SECTOR = a.ARG_SECTOR_128;
+    return CheckTrack();
+  }
+  if (NEW_COUNT == 0)
+    return ReadWrite512();
+  --NEW_COUNT;
+  if (NEW_DISK != a.ARG_SELDISK || NEW_TRACK != a.ARG_TRACK || NEW_SECTOR != a.ARG_SECTOR_128)
+    return ReadWrite512();
+  return CheckTrack();
+}
+
+void cmd_bios_wr_rect()
+{
+  dma_receive(&a.WRITE_MODE, 6);
+  bool res = BiosWrite();
+  sendByte(res ? STA_OK_CMD : ERR_DISK_ERR);
+}
+
+
+enum {
+  CMD_BIOS_HOME = 10,
+  CMD_BIOS_SEL_DSK,
+  CMD_BIOS_SET_TRK,
+  CMD_BIOS_SET_SECT,
+  CMD_BIOS_RD_RECT,
+  CMD_BIOS_WR_RECT,
+};
+
 
 BYTE RkSd_Loop()
 {
@@ -777,7 +1011,7 @@ BYTE RkSd_Loop()
     {
       sendByte(STA_OK_DISK);
       recvStart();
-      c = wrecv();
+      c = recvByte();
       // Зажигаем светодиод
       LedOn();
 
@@ -819,6 +1053,25 @@ BYTE RkSd_Loop()
       case 9:
         LedOff();
         return 0;
+      case CMD_BIOS_HOME:
+        cmd_bios_home();
+        break;
+      case CMD_BIOS_SEL_DSK:
+        cmd_bios_sel_dsk();
+        break;
+      case CMD_BIOS_SET_TRK:
+        cmd_bios_set_trk();
+        break;
+      case CMD_BIOS_SET_SECT:
+        cmd_bios_set_sect();
+        break;
+      case CMD_BIOS_RD_RECT:
+        cmd_bios_rd_rect();
+        break;
+       case CMD_BIOS_WR_RECT:
+        cmd_bios_wr_rect();
+        break;
+     
 #if 1
       case 0x2A:
         cmd_get_date();
@@ -839,11 +1092,12 @@ BYTE RkSd_Loop()
       //MTX_EXIT();
 
       // Вывод ошибки
-      if (lastError && c != STA_START) 
+      if (lastError && c != STA_START)
+      {
+        // if (lastError!=ERR_FILE_EXISTS)
+        //   panic("error");
         sendStart(lastError);
-#if USE_DMA
-      sendFlush();
-#endif
+      } 
     }
 
 #if 0// !USE_DMA
@@ -866,86 +1120,6 @@ const uint fifoReadSm = 0;
 const uint fifoWrite2Sm = 1;
 extern int res;
 
-#define INTS_OFF 0
-void __not_in_flash_func(dma_send)(BYTE *ptr, WORD len)
-{
-#if 1
-  gpio_init(PIN_DRQ);
-  gpio_put(PIN_DRQ, 1);
-  gpio_set_dir(PIN_DRQ, GPIO_OUT);
-  pio_gpio_init(FIFO_PIO, PIN_DIR);
-  pio_sm_drain_tx_fifo(FIFO_PIO, dmaReadSm);
-  pio_sm_restart(FIFO_PIO, dmaReadSm);
-#if INTS_OFF
-  uint32_t ints = save_and_disable_interrupts();
-#endif
-  do
-  {
-    pio_sm_put_blocking(FIFO_PIO, dmaReadSm, *ptr++ | (0xFF << 8));
-  } while (--len);
-#if INTS_OFF
-  restore_interrupts(ints);
-#endif
-  while (!pio_sm_is_tx_fifo_empty(FIFO_PIO, dmaReadSm)) ;
-  while (gpio_get(PIN_nDACK) == 0) ;
-  gpio_put(PIN_DRQ, 0);
-#else
-  gpio_init(PIN_DRQ);
-  gpio_put(PIN_DRQ, 1);
-  gpio_set_dir(PIN_DRQ, GPIO_OUT);
-  uint32_t ints = save_and_disable_interrupts();
-  do
-  {
-    DATA_IN();
-    while (gpio_get_all() & (nIOR_MASK | nDACK_MASK))
-      ;
-    DATA_OUT();
-    WRITE_DATA(*ptr++); // PORTD = *ptr++;
-    while (gpio_get(nIOR) == 0)
-      ;
-  } while (--len);
-  gpio_put(PIN_DRQ, 0);
-  restore_interrupts(ints);
-#endif
-}
-
-void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
-{
-#if 1
-  uint mask = DRQ_MASK | DIR_MASK;
-  gpio_init_mask(mask);
-  gpio_put_masked(mask, mask);
-  gpio_set_dir_out_masked(mask);
-#if INTS_OFF
-  uint32_t ints = save_and_disable_interrupts();
-#endif
-  //uint16_t *ptr1 = (uint16_t*)ptr;
-  //len /= 2;
-  do
-  {
-    *ptr++ = pio_sm_get_blocking(DMA_PIO, dmaWriteSm) & 0xFF;
-  } while (--len);
-#if INTS_OFF
-  restore_interrupts(ints);
-#endif
-  gpio_put(PIN_DRQ, 0);
-  while (gpio_get(PIN_nDACK) == 0) ;
-#else
-  DATA_IN();
-  gpio_put(PIN_DRQ, 1);
-  uint32_t ints = save_and_disable_interrupts();
-  do
-  {
-    while (gpio_get_all() & (nIOW_MASK | nDACK_MASK))
-      ;
-    while (gpio_get(nIOW) == 0)
-      ;
-    *ptr++ = READ_DATA();
-  } while (--len);
-  gpio_put(DRQ, 0);
-  restore_interrupts(ints);
-#endif
-}
 
 volatile uint8_t v55_buf[4] = {0,0,0,0};
 
@@ -992,26 +1166,7 @@ bool bDir = false;
 
 //void RkSd_main();
 auto_init_mutex(sd_mutex);
-static recursive_mutex_t sd_mutex2;
-
-#if 1
-recursive_mutex_t *  get_sd_mutex()
-{
-  return &sd_mutex2;
-}
-void MTX_ENTER()
-{
-  recursive_mutex_enter_blocking(&sd_mutex2);
-}
-bool MTX_TRY_ENTER()
-{
-  recursive_mutex_try_enter(&sd_mutex2, NULL);
-}
-void MTX_EXIT()
-{
-  recursive_mutex_exit(&sd_mutex2);
-}
-#endif
+recursive_mutex_t sd_mutex2;
 
 extern volatile uint16_t addr;
 extern volatile bool bStopRomEmu;
@@ -1035,7 +1190,8 @@ void  __not_in_flash_func(main_sd)()
     error();
   multicore_fifo_push_blocking(0);
   {
-    mutex_enter_blocking(&sd_mutex);
+    //mutex_enter_blocking(&sd_mutex);
+    MTX_ENTER();
     strcpy(buf, "boot/boot.rk");
     if (fs_open())
       error();
@@ -1071,7 +1227,8 @@ void  __not_in_flash_func(main_sd)()
     }
 #endif
     }
-    mutex_exit(&sd_mutex);
+    //mutex_exit(&sd_mutex);
+    MTX_EXIT();
   }
   //while (true) ;
 #if !USE_DMA

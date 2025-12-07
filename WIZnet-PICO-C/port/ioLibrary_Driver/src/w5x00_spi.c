@@ -290,7 +290,7 @@ void wizchip_check(void)
     if (getVERSIONR() != 0x04)
     {
         printf(" ACCESS ERR : VERSION != 0x04, read value = 0x%02x\n", getVERSIONR());
-
+        panic("Init net");
         while (1)
             ;
     }

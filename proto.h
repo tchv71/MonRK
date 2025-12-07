@@ -17,13 +17,14 @@ void  __time_critical_func(wait)();
 #endif
 void sendStart(BYTE c); 
 void sendByte(BYTE c);
-void recvStart();
-BYTE wrecv();
+void sendWord(WORD w);
+#define recvStart()
+BYTE recvByte();
+WORD recvWord();
 #if USE_DMA
-void __not_in_flash_func(dma_receive)(BYTE* ptr1, WORD len);
-void __not_in_flash_func(dma_send)(BYTE* ptr1, WORD len);
-void sendFlush();
-void recvStartNoDma();
+void dma_receive(BYTE* ptr, WORD len);
+void dma_send(const BYTE* ptr, WORD len);
+#define recvStartNoDma()
 #endif
 /**
   * @brief  RTC Date structure definition

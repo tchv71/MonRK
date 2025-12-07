@@ -81,12 +81,17 @@ const char *Device_writeSector(const struct Device *this, int track, int sector,
     return "Error image seek";
   }
   fs_wtotal = this->secLength;
-  if (fs_write_start() != FR_OK)
-    return "Error write to image";
-  fs_file_wlen = this->secLength;
-  memcpy(fs_file_wbuf, buf1, this->secLength);
-  if (fs_write_end() != FR_OK)
-    return "Error write to image";
+  WORD SD_SECLEN = 512;
+  fs_file_wlen = SD_SECLEN;
+  while (fs_wtotal)
+  {
+   if (fs_write_start() != FR_OK)
+      return "Error write to image";
+    memcpy(fs_file_wbuf, buf1, SD_SECLEN);
+     if (fs_write_end() != FR_OK)
+      return "Error write to image";
+    buf1 += SD_SECLEN;
+  }
   
   return (const char*)0;
 }

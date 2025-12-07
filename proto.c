@@ -10,13 +10,7 @@ void RkSd_Main();
 extern const uint dmaRomSm;
 
 
-#if USE_DMA
-enum DMA_MODE { DM_NONE = 0, DM_SEND, DM_RECEIVE} dm_mode;
-BYTE cmd_buf_send[32];
-BYTE cmd_buf_recv[32];
-BYTE* cmd_buf_send_ptr = cmd_buf_send;
-BYTE* cmd_buf_recv_ptr = cmd_buf_recv;
-#else
+#if !USE_DMA
 void DATA_BUS_OUT()
 {}
 
@@ -43,22 +37,13 @@ void __not_in_flash_func(sendStart)(BYTE c)
   DATA_BUS_OUT();
   WRITE_DATA(c);
 #else
-  dm_mode = DM_SEND;
-  cmd_buf_send_ptr = cmd_buf_send;
-  *cmd_buf_send_ptr++=c;
+  sendByte(c);
 #endif
 }
 
 #if USE_DMA
-void recvStartNoDma()
-{
-  if (dm_mode == DM_SEND && cmd_buf_send_ptr != cmd_buf_send)
-    sendFlush();
-  dm_mode = DM_RECEIVE;
-  cmd_buf_recv_ptr = cmd_buf_recv;
-}
+#define recvStartNoDma()
 
-WORD l;
 #else
 extern volatile bool bEvent;
 void  inline __time_critical_func(wait)()
@@ -81,25 +66,37 @@ void  inline __time_critical_func(wait)()
 }
 #endif
 
+#if !USE_DMA
 void __not_in_flash_func(recvStart)()
 {
-#if !USE_DMA
   wait ();
   DATA_BUS_IN ();
-#else
-  recvStartNoDma();
-  dma_receive((BYTE*)&l, 2);
-  dma_receive(cmd_buf_recv, l);
-#endif
 }
+#else
+#define recvStart()
+#endif
 
-BYTE __not_in_flash_func(wrecv)()
+BYTE __not_in_flash_func(recvByte)()
 {
 #if !USE_DMA
   wait ();
   return READ_DATA();
 #else
-  return *cmd_buf_recv_ptr++;
+  BYTE c;
+  dma_receive(&c, 1);
+   return c;
+#endif
+}
+
+WORD __not_in_flash_func(recvWord)()
+{
+#if !USE_DMA
+  WORD w = wrecv();
+  return w | ((WORD)(wrecv()))<<8;
+#else
+  WORD w;
+  dma_receive((BYTE*)&w, 2);
+  return w;
 #endif
 }
 
@@ -109,21 +106,102 @@ void __not_in_flash_func(sendByte)(BYTE c)
   wait ();
   WRITE_DATA(c);
 #else
-  *cmd_buf_send_ptr++=c;
+  static BYTE c1;
+  c1 = c;
+  dma_send(&c1, 1);
 #endif
 }
-#if USE_DMA
-WORD lSend;
-void sendFlush()
+
+void __not_in_flash_func(sendWord)(WORD w)
 {
-  lSend = cmd_buf_send_ptr - cmd_buf_send;
-  BYTE len[2];
-  len[0] = lSend&255;
-  len[1] = lSend>>8;
-  if (lSend == 0)
-    return;
-  dma_send(len, 2);
-  dma_send(cmd_buf_send, lSend);
-  cmd_buf_send_ptr = cmd_buf_send;
-}
+#if !USE_DMA
+  wait ();
+  WRITE_DATA(c);
+#else
+  static WORD w1;
+  w1 = w;
+  dma_send((const BYTE*)&w1, 2);
 #endif
+}
+
+
+extern const uint dmaWriteSm;
+// const uint dmaRomSm = 2;
+// const uint dmaReadSm = 1;
+// const uint fifoReadSm = 0;
+// const uint fifoWrite2Sm = 1;
+
+#define INTS_OFF 0
+void __not_in_flash_func(dma_send)(const BYTE *ptr, WORD len)
+{
+#if 1
+  gpio_put(PIN_DRQ, 1);
+#if INTS_OFF
+  uint32_t ints = save_and_disable_interrupts();
+#endif
+  uint32_t val;
+  do
+  {
+    val = *ptr++ | (0xFF << 8);
+    pio_sm_put_blocking(FIFO_PIO, dmaReadSm, val);
+  } while (--len);
+#if INTS_OFF
+  restore_interrupts(ints);
+#endif
+  while (!pio_sm_is_tx_fifo_empty(FIFO_PIO, dmaReadSm)) ;
+  while (gpio_get(PIN_nDACK) == 0) ;
+  gpio_put(PIN_DRQ, 0);
+#else
+  gpio_init(PIN_DRQ);
+  gpio_put(PIN_DRQ, 1);
+  gpio_set_dir(PIN_DRQ, GPIO_OUT);
+  uint32_t ints = save_and_disable_interrupts();
+  do
+  {
+    DATA_IN();
+    while (gpio_get_all() & (nIOR_MASK | nDACK_MASK))
+      ;
+    DATA_OUT();
+    WRITE_DATA(*ptr++); // PORTD = *ptr++;
+    while (gpio_get(nIOR) == 0)
+      ;
+  } while (--len);
+  gpio_put(PIN_DRQ, 0);
+  restore_interrupts(ints);
+#endif
+}
+
+void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
+{
+#if 1
+  gpio_put(PIN_DRQ, 1);
+#if INTS_OFF
+  uint32_t ints = save_and_disable_interrupts();
+#endif
+  //uint16_t *ptr1 = (uint16_t*)ptr;
+  //len /= 2;
+  do
+  {
+    *ptr++ = pio_sm_get_blocking(DMA_PIO, dmaWriteSm) & 0xFF;
+  } while (--len);
+#if INTS_OFF
+  restore_interrupts(ints);
+#endif
+  gpio_put(PIN_DRQ, 0);
+  while (gpio_get(PIN_nDACK) == 0) ;
+#else
+  DATA_IN();
+  gpio_put(PIN_DRQ, 1);
+  uint32_t ints = save_and_disable_interrupts();
+  do
+  {
+    while (gpio_get_all() & (nIOW_MASK | nDACK_MASK))
+      ;
+    while (gpio_get(nIOW) == 0)
+      ;
+    *ptr++ = READ_DATA();
+  } while (--len);
+  gpio_put(DRQ, 0);
+  restore_interrupts(ints);
+#endif
+}
