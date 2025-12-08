@@ -436,6 +436,11 @@ long ftpd_cpm_run(uint8_t* dbuf)
 			printf("%s\r\n", dbuf);
 #endif
 			size = (int)strlen(dbuf);
+			if (size ==0)
+			{
+				strcpy(dbuf, " ");
+				size = (int)strlen(dbuf);
+			}
 			char* pData = dbuf;
 			while (size > 0)
 			{
