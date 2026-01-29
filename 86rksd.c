@@ -92,13 +92,18 @@ void readInt(char rks)
   WORD readedLength, lengthFromFile;
   BYTE tmp;
   BYTE *wptr;
+  WORD SEC_LEN = 512;
+
+  if (readLength == 1024)
+    SEC_LEN = readLength;
 
   while (readLength)
   {
     // Расчет длины блока (выравниваем чтение на сектор)
     if (fs_tell())
       return;
-    readedLength = 512 - (fs_tmp % 512);
+    
+    readedLength = SEC_LEN - (fs_tmp % SEC_LEN);
     if (readedLength > readLength)
       readedLength = readLength;
 
@@ -270,7 +275,7 @@ void cmd_find()
 
   // Принимаем макс кол-во элементов
   n = recvWord();
-  n = 1000;
+  //n = 1000;
 
   // MTX_ENTER();
   // sleep_ms(100);
@@ -1181,15 +1186,15 @@ int res = 0;
 void  __not_in_flash_func(main_sd)()
 {
   DATA_IN();
+  //busy_wait_ms(500);
+  multicore_fifo_push_blocking(0);
   LedOn();
   // Пауза, пока не стабилизируется питание
-  /* delay_ms */ //sleep_ms(500);
-
+  //sleep_ms(300);
   // Запуск файловой системы
   if (fs_init())
     error();
-  multicore_fifo_push_blocking(0);
-  {
+   {
     //mutex_enter_blocking(&sd_mutex);
     MTX_ENTER();
     strcpy(buf, "boot/boot.rk");

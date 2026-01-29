@@ -38,7 +38,7 @@ start:
   jmp pin readStatus  ; if PIN_A0_28 'mode' is high, read status bits 
 readData:
   ;mov x, null
-  set x,0x15
+  ;set x,0x15
   pull noblock
   out pins, 8         ; mode is low, send the data byte
   jmp endPart
@@ -64,19 +64,31 @@ endPart:
   mov osr, null       ; change CD0-7 pindirs to inputs
   out pindirs, 8 side 1
 
+pullLoop:
   wait 0 gpio PIN_nCS2
-  jmp pin romRead
-  mov isr, null
+  jmp pin romRead ; PIN_nWR
   wait 1 gpio PIN_nWR
-  in pins 26;14+8
-  push noblock
   jmp s1
+rr01:
+  out null, 8
+  jmp loop0
 romRead:
+  in pins, 2
+  ;in null, 1
+  mov y, isr
   pull noblock
-  mov x, osr        ; ensure we have a valid fifo value in x
-  out pins, 8       ; send the data byte
+  mov x, osr
+loop0:
+  jmp y--, rr01
+  ;jmp rr02
+rr02:
+  out pins, 8
+  mov osr, !null
   out pindirs, 8 side 0   ; set up CD0-7 as outputs
+
 s1:
+  in pins, 26;14+8+4
+  push noblock
   wait 1 gpio PIN_nCS2
 .wrap
 
@@ -89,13 +101,13 @@ s1:
   out pindirs, 8 side 1
 
   wait 1 gpio nDACK_PIN ; wait for nDACK_PIN to go inactive (high)
-  set pins, 1
+  ;set pins, 1
   wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
   wait 0 gpio nIOR_PIN  ; wait for nIOR to go active (low)
   pull block
   out pins, 8           ; send the data byte
   out pindirs, 8 side 0 ; set up CD0-7 as outputs
-  set pins, 0           ; reset wait trigger
+  ;set pins, 0           ; reset wait trigger
   wait 1 gpio nIOR_PIN ; wait for nIOR_PIN to go inactive (high)
 .wrap
 

@@ -19,8 +19,42 @@
 #include "pico/sync.h"
 #include "CircBuffer.h"
 
+#include "tusb_config.h"
+#include "tusb.h"
+#include "scancode_rk.h"
+#include "ws2812.h"
+#include "init.h"
+
+#define LEDBR 12
+
+bool kb_enabled = true;
+uint8_t kb_addr = 0;
+uint8_t kb_inst = 0;
+
+bool blinking = false;
+//alarm_id_t repeater;
+
+uint8_t prev_rpt[] = {0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t prev_kb = 0;
+uint8_t resend_kb = 0;
+uint8_t resend_ms = 0;
+uint8_t repeat = 0;
+
+
 extern void setup();
 extern void loop();
+
+typedef struct
+{
+  tusb_desc_device_t desc_device;
+  uint16_t manufacturer[32];
+  uint16_t product[32];
+  uint16_t serial[16];
+  bool mounted;
+} dev_info_t;
+// CFG_TUH_DEVICE_MAX is defined by tusb_config header
+dev_info_t dev_info[CFG_TUH_DEVICE_MAX] = {0};
+
 
 // void process_menu(char &inbyte);
 
@@ -90,18 +124,18 @@ void fifoPioInit()
     bufIn.clear();
     bufOut.clear();
 
-#if USE_SERIAL_DEBUG
-    pio_sm_claim(FIFO_PIO, fifoReadSm);
-    int fifoReadProgOffset = pio_add_program(FIFO_PIO, &fifoRead_program);
-    if (fifoReadProgOffset < 0)
-        panic("Failed add fifoReadProgram");
-
     for (uint i = 0; i < 8; ++i)
     {
         pio_gpio_init(FIFO_PIO, PIN_CD7 + i);
         gpio_set_drive_strength(PIN_CD7 + i, GPIO_DRIVE_STRENGTH_12MA);
     }
     pio_gpio_init(FIFO_PIO, PIN_DIR);
+#if USE_SERIAL_DEBUG
+    pio_sm_claim(FIFO_PIO, fifoReadSm);
+    int fifoReadProgOffset = pio_add_program(FIFO_PIO, &fifoRead_program);
+    if (fifoReadProgOffset < 0)
+        panic("Failed add fifoReadProgram");
+
     pio_sm_set_pins_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
     pio_sm_set_pindirs_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
     // pio_sm_set_consecutive_pindirs(FIFO_PIO, fifoReadSm, DIR, 1, true);
@@ -147,15 +181,19 @@ void fifoPioInit()
  * FIFO pio for read-like programs
  * DMA pio for write-like due to the same used pins
  */
+extern void __not_in_flash_func(updateTX)();
+
 void dmaPioInit()
 {
-#if !USE_DMA
+#if !USE_DMA || KBD_EMU
     // DMA Read  = SD  -> Mem
     // DMA Write = Mem -> SD
-    int romProgramOffset = pio_add_program(FIFO_PIO, &rom_program);
+    PIO pio = FIFO_PIO;
+    uint irq = PIO0_IRQ_0;
+    int romProgramOffset = pio_add_program(pio, &rom_program);
     if (romProgramOffset < 0)
         panic("Failed add fifoReadProgram");
-    pio_sm_clear_fifos(FIFO_PIO, dmaRomSm);
+    pio_sm_clear_fifos(pio, dmaRomSm);
 
     pio_sm_config romConfig = rom_program_get_default_config(romProgramOffset);
     sm_config_set_in_pins(&romConfig, PIN_A0);
@@ -168,13 +206,15 @@ void dmaPioInit()
     sm_config_set_out_shift(&romConfig, SH_RIGHT, false, 32); // R shift
     sm_config_set_clkdiv(&romConfig, 1.0f);
 
-    pio_sm_init(FIFO_PIO, dmaRomSm, romProgramOffset, &romConfig);
-    pio_set_irq1_source_enabled(FIFO_PIO, pis_sm1_rx_fifo_not_empty, true);
-    irq_set_exclusive_handler(PIO0_IRQ_1, pio_irq_handler_rom);
-    irq_set_enabled(PIO0_IRQ_1, true);
-    pio_sm_set_enabled(FIFO_PIO, dmaRomSm, true /* false */);
+    pio_sm_init(pio, dmaRomSm, romProgramOffset, &romConfig);
+    pio_set_irq0_source_enabled(pio, pis_sm2_rx_fifo_not_empty, true);
+    irq_set_exclusive_handler(irq, pio_irq_handler_rom);
+    irq_set_enabled(irq, true);
+    pio_sm_set_enabled(pio, dmaRomSm, true /* false */);
     enable_interrupts();
-#else
+    updateTX();
+#endif
+#if USE_DMA
     uint dmaWriteProgOffset = pio_add_program(DMA_PIO, &dmaWrite_program);
      if (dmaWriteProgOffset < 0)
         panic("Failed add dmaWriteProgram");
@@ -303,6 +343,120 @@ void setup()
 #define PICO_CLOCK_PLL_DIV1 5
 #define PICO_CLOCK_PLL_DIV2 1
 
+#ifdef KBD_EMU
+///////////////////////////////////////////////////////////////////////////////////////////////
+//------------------------------------------------------------------------------
+uint8_t type_hid = 0;
+//------------------------------------------------------------------------------
+// mouse
+uint8_t mouse_x = 0xff;
+uint8_t mouse_y = 0xff;
+uint8_t mouse_b = 0xff; //#FADF - поpт  кнопок
+uint8_t joy_k = 0xff;
+
+volatile int8_t mouseDirectionX = 0;    // X direction (0 = decrement, 1 = increment)
+volatile int8_t mouseEncoderPhaseX = 0; // X Quadrature phase (0-3)
+
+volatile int8_t mouseDirectionY = 0;    // Y direction (0 = decrement, 1 = increment)
+volatile int8_t mouseEncoderPhaseY = 0; // Y Quadrature phase (0-3)
+
+volatile int16_t mouseDistanceX = 0; // Distance left for mouse to move
+volatile int16_t mouseDistanceY = 0; // Distance left for mouse to move
+//------------------------------------------------------------------------------
+// void mouse(uint8_t const *report, uint16_t len )
+void mouse(hid_mouse_report_t const *report, uint16_t len)
+
+{
+  // debug_print("B=%02X X=%02d Y=%02d #1F=%02X        %02X\r\n", mouse_b, mouse_x, mouse_y, joy_k ,type_hid );
+}
+//------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+// Вызывается при получении отчета от устройства через конечную точку прерывания
+// Примечание: если есть идентификатор отчета (составной), то это 1-й байт отчета
+void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *report, uint16_t len)
+{
+  switch (tuh_hid_interface_protocol(dev_addr, instance))
+  {
+
+  case HID_ITF_PROTOCOL_KEYBOARD:
+    kb_addr = dev_addr;
+    kb_inst = instance;
+    rk_keyboard((const hid_keyboard_report_t *)report, len);
+    break;
+
+  case HID_ITF_PROTOCOL_MOUSE: // mouse(report, len);break;
+  {
+  }
+  default:
+    break; // gamepad (report,len);break;
+           // continue to request to receive report
+  }
+  if (!tuh_hid_receive_report(dev_addr, instance))
+      panic("Error: cannot request to receive report\r\n");
+}
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////
+// Invoked when device is mounted (configured)
+/*  void tuh_mount_cb (uint8_t daddr)
+{
+   if(DEBUG) printf("tuh_mount_cb = %d\r\n", daddr);
+
+
+} */
+
+///////////////////////////////////////////////////////////////////////////////////////////
+// Вызывается при подключении устройства с интерфейсом hid
+// Дескриптор отчета также доступен для использования. tuh_hid_parse_report_descriptor()
+// может использоваться для анализа общего /достаточно простого дескриптора.
+// Примечание: если длина дескриптора отчета > CFG_TUH_ENUMERATION_BUFSIZE, он будет пропущен
+// следовательно, report_desc = NULL, desc_len = 0
+void tuh_hid_mount_cb(uint8_t daddr, uint8_t instance, uint8_t const *desc_report, uint16_t desc_len)
+{
+  //debug_print("HID device address = %d, instance = %d is mounted\n", daddr, instance);
+
+  dev_info_t *dev = &dev_info[daddr - 1];
+  dev->mounted = true;
+
+  // Get Device Descriptor
+  // tuh_descriptor_get_device(daddr, &dev->desc_device, 18, print_device_descriptor, 0);
+
+  switch (tuh_hid_interface_protocol(daddr, instance))
+  {
+  case HID_ITF_PROTOCOL_KEYBOARD:
+    //debug_print("HID Interface Protocol = Keyboard\n");
+
+    kb_addr = daddr;
+    kb_inst = instance;
+
+    tuh_hid_receive_report(daddr, instance);
+    ws2812_set_rgb(0, LEDBR, LEDBR);
+    break;
+
+  case HID_ITF_PROTOCOL_MOUSE:
+    //debug_print("HID Interface Protocol = Mouse\n");
+
+    tuh_hid_receive_report(daddr, instance);
+    break;
+  }
+}
+// Вызывается, когда устройство с интерфейсом hid не подключено
+void tuh_hid_umount_cb(uint8_t daddr, uint8_t instance)
+{
+  //debug_print("HID device address = %d, instance = %d is unmounted\r\n", daddr, instance);
+  dev_info_t *dev = &dev_info[daddr - 1];
+  dev->mounted = false;
+
+  // print device summary
+  //print_lsusb();
+
+  ws2812_set_rgb(LEDBR, 0, 0);
+}
+#endif
+
 int main()
 {
     vreg_set_voltage(VREG_VOLTAGE_1_30);
@@ -314,9 +468,16 @@ int main()
 
     multicore_launch_core1(main1);
     setup();
+#ifdef KBD_EMU
+    tusb_init(); // инициализация USB OTG
+    kb_update_leds();
+#endif
     while (true)
     {
-        tight_loop_contents();
+        //tight_loop_contents();
         loop();
+#ifdef KBD_EMU
+        tuh_task();
+#endif
     }
 }

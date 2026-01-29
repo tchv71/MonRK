@@ -23,6 +23,7 @@ extern "C"
 #include "pico/multicore.h"
 #include "pico/sync.h"
 #include "CircBuffer.h"
+#include "init.h"
 
 const uint8_t RXEMPTY = 1; // MASK FOR RX BUFFER EMPTY
 
@@ -70,21 +71,57 @@ void __not_in_flash_func(pio_irq_handler_write)()
 
 extern "C" const uint dmaRomSm;
 
+#ifndef KBD_EMU
 volatile uint16_t addr = 0;
 static uint16_t lastAddr = 0;
 static uint16_t lastAddr2 = 0;
 volatile bool bStopRomEmu = false;
 volatile bool bEvent = false;
+#endif
+//volatile uint8_t rowMask = 0xff;
+uint32_t __a;
+volatile uint8_t __aligned(8) kbdMatr[8] = {255,255,255,255,255,255,255,255};
+volatile uint8_t portA = 0;
+volatile uint8_t portC = 0xE0; 
+volatile uint8_t portB = 0xFF; 
+
+
 void __not_in_flash_func(pio_irq_handler_rom)()
 {
     if (pio_sm_is_rx_fifo_empty(FIFO_PIO, dmaRomSm))
         return;
     uint32_t val = pio_sm_get_blocking(FIFO_PIO, dmaRomSm); // FIFO_PIO->rxf[dmaRomSm];
 
+    bool bWrite = (val & (1 << (PIN_nRD + 4))) != 0;
+
     uint8_t w_addr = (val & 3);
+    if (!bWrite)
+    {
+        updateTX();
+        return;
+    }
     uint8_t v_val = (val & (GPIO_CD_MASK << 4)) >> (PIN_CD7 + 4);
     switch (w_addr)
     {
+#ifdef KBD_EMU
+    case 0:
+        portA = v_val;
+        updateTX();
+        break;
+    case 2:
+        break;
+    case 3:
+        if ((v_val & 0x80) == 0)
+        {
+            uint8_t bitNo = (v_val >> 1) & 7;
+            if (v_val & 1)
+                portC |= 1 << bitNo;
+            else
+                portC &= ~(1 << bitNo);
+        }
+        break;
+
+#else
     case 1:
         addr = v_val;
         if (addr == 0x20)
@@ -102,10 +139,12 @@ void __not_in_flash_func(pio_irq_handler_rom)()
         pio_sm_put_blocking(FIFO_PIO, dmaRomSm, 0xFF << 8 | r_val);
     }
     break;
+#endif
     default:
         break;
     }
     v55_buf[w_addr] = v_val;
+#ifndef KBD_EMU
     if (bStopRomEmu)
         return;
 #if 1
@@ -124,6 +163,7 @@ void __not_in_flash_func(pio_irq_handler_rom)()
         else
             lastAddr = 0;
     }
+#endif
 #endif
 }
 //     1   1   2   2   3   3   0   0
