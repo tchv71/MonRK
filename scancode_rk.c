@@ -115,7 +115,7 @@ uint8_t tab_key_old[128] = {0x00}; // таблица предыдушего на
 #define Kl_DOT	A3+D6	// . точка
 #define Kl_DIV	A3+D7	// / ? деление
 
-#define Kl_AMP	A4+D0	// @ амперсанд
+#define Kl_AT	A4+D0	// @ амперсанд
 #define Kl_A	A4+D1
 #define Kl_B	A4+D2
 #define Kl_C	A4+D3
@@ -148,7 +148,7 @@ uint8_t tab_key_old[128] = {0x00}; // таблица предыдушего на
 #define Kl_BL	A7+D3	// [
 #define Kl_OSL	A7+D4	// \_  
 #define Kl_BR	A7+D5	// ]
-#define Kl_KAV	A7+D6	// ^
+#define Kl_HAT	A7+D6	// ^
 #define Kl_SP	A7+D7	//Пробел
 
 #define Kl_NOKEY 0xFF
@@ -189,16 +189,16 @@ uint8_t tab_kbd[] = {				//	 vvv - а это клавиша IBM
 	Kl_U,Kl_G,				//18h	U
 	Kl_V,Kl_M,				//19h	V
 	Kl_W,Kl_C,				//1Ah	W
-	Kl_X,Kl_KAV,			//1Bh	X
+	Kl_X,Kl_HAT,			//1Bh	X
 	Kl_Y,Kl_N,				//1Ch	Y
 	Kl_Z,Kl_Q,				//1Dh	Z
 	Kl_1,Kl_1,				//1Eh	1/!
-	AltTb+6,AltTb+6,		//1Fh	2/@
+	AltTb+6,Kl_2,			//1Fh	2/@
 	Kl_3,Kl_3,				//20h	3/#
 	Kl_4,Kl_4,				//21h	4/$
 	Kl_5,Kl_5,				//22h	5/%
-	AltTb+8,AltTb+8,		//23h	6/^
-	AltTb+9,AltTb+9,		//24h	7/&
+	AltTb+8,AltTb+27,		//23h	6/^
+	AltTb+9,AltTb+28,		//24h	7/&
 	AltTb+1,AltTb+1,		//25h	8/*
 	AltTb+2,AltTb+2,		//26h	9/(
 	AltTb+3,AltTb+3,		//27h	0/)
@@ -217,7 +217,7 @@ uint8_t tab_kbd[] = {				//	 vvv - а это клавиша IBM
 	AltTb+10,AltTb+7,		//34h	'/"
 	0xFF,0xFF,				//35h	`/~ 
 	Kl_COMMA,Kl_B,			//36h	,/<
-	Kl_DOT,Kl_AMP,			//37h	./>
+	Kl_DOT,Kl_AT,			//37h	./>
 	Kl_DIV,AltTb+26,		//38h	//?
 	0xFF,0xFF,				//39h	Caps Lock
 	Kl_F1,Kl_F1,			//3Ah 	F1
@@ -280,9 +280,9 @@ uint8_t AltTab[]={
 	Kl_0,Kl_9+Shift,		    // 3	27h	0/)
 	Kl_MNS,Kl_BS+Shift,		    // 4	2Dh	-/_
 	Kl_MNS+Shift, Kl_PLS+Shift,	// 5	2Eh	=/+
-	Kl_2,Kl_AMP,			    // 6	2Eh	2/@
+	Kl_2,Kl_AT,			        // 6	2Eh	2/@
 	Kl_OSL,Kl_OSL,				// 7	35h	 `/~ 
-	Kl_6,Kl_KAV,			    // 8	23h	6/^
+	Kl_6,Kl_HAT,			    // 8	23h	6/^
 	Kl_7,Kl_6+Shift,			// 9	24h	7/&
 	Kl_2+Shift,Kl_7+Shift,		//10	34h	'/"
 	Kl_PLS+Shift,Kl_PLS+Shift,	//11	57h	[+]
@@ -301,6 +301,8 @@ uint8_t AltTab[]={
 	Kl_4,Kl_4,			        //24	5Ch	[4]
 	Kl_7,Kl_7,			        //25	5Fh	[7]
 	Kl_DOT, Kl_COMMA,			//26	38h	//?    
+	Kl_6, Kl_DVT,			    //27	23h	6/^
+	Kl_7,Kl_DIV+Shift,			//28	24h	7/&
 };
 
 //--------------------------------------------
@@ -314,9 +316,9 @@ uint8_t AltTab2[]={
 	Kl_0,Kl_9+Shift,		    // 3	27h	0/)
 	Kl_MNS,Kl_BS+Shift,		    // 4	2Dh	-/_
 	Kl_MNS+Shift, Kl_PLS+Shift,	// 5	2Eh	=/+
-	Kl_2,Kl_AMP,			    // 6	2Eh	2/@
+	Kl_2,Kl_AT,			        // 6	2Eh	2/@
 	Kl_OSL,Kl_OSL,				// 7	35h	 `/~ 
-	Kl_6,Kl_KAV,			    // 8	23h	6/^
+	Kl_6,Kl_HAT,			    // 8	23h	6/^
 	Kl_7,Kl_6+Shift,			// 9	24h	7/&
 	Kl_2+Shift,Kl_7+Shift,		//10	34h	'/"
 	Kl_PLS+Shift,Kl_PLS+Shift,	//11	57h	[+]
@@ -335,6 +337,8 @@ uint8_t AltTab2[]={
 	Kl_LFT,Kl_LFT,		        //24	5Ch	[4] [Left]
 	Ctrl+Kl_LFT,Ctrl+Kl_LFT,    //25	5Fh	[7] [Home]
 	Kl_DOT, Kl_COMMA,			//26	38h	//?    
+	Kl_6, Kl_DVT,			    //27	23h	6/^
+	Kl_7,Kl_DIV+Shift,			//28	24h	7/&
 };
 //********************************************
 uint8_t rk_matrix[8] = {0};
