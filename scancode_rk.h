@@ -18,6 +18,7 @@ void __force_inline __not_in_flash_func(updateTX)()
 {
     //while (!pio_sm_is_tx_fifo_empty(FIFO_PIO, dmaRomSm))
     //uint32_t val = FIFO_PIO->txf[dmaRomSm];
+    //portA = 0x7F;
     portB = 0xff;
     // if (portA==0)
     // {
@@ -33,9 +34,10 @@ void __force_inline __not_in_flash_func(updateTX)()
             mask = mask << 1;
         }
     }
+    //portC &= ~0x20;
     pio_sm_clear_fifos(FIFO_PIO, dmaRomSm);
 
-    pio_sm_put(FIFO_PIO, dmaRomSm, ((uint32_t)portC << 16) | ((uint32_t)portB << 8) | (uint32_t)portA);
+    pio_sm_put_blocking(FIFO_PIO, dmaRomSm, ((uint32_t)portC << 24) | ((uint32_t)portB << 16) | ((uint32_t)portA<<8) | 0xFF);
 }
 
 #ifdef __cplusplus

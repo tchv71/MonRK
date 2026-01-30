@@ -97,7 +97,8 @@ void __not_in_flash_func(pio_irq_handler_rom)()
     uint8_t w_addr = (val & 3);
     if (!bWrite)
     {
-        updateTX();
+        if (w_addr==2)
+         updateTX();
         return;
     }
     uint8_t v_val = (val & (GPIO_CD_MASK << 4)) >> (PIN_CD7 + 4);

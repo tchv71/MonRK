@@ -225,11 +225,11 @@ uint8_t tab_kbd[] = {				//	 vvv - а это клавиша IBM
 	Kl_F3,Kl_F3,			//3Ch	F3
 	Kl_F4,Kl_F4,			//3Dh	F4
 	Kl_F5,Kl_F5,			//3Eh	F5
-	0xFF,0xFF,				//3Fh	F6
-	0xFF,0xFF,				//40h	F7
-	0xFF,0xFF,				//41h	F8
-	0xFF,0xFF,				//42h	F9
-	0xFF,0xFF,				//43h	F10
+	Shift+Kl_F1,Shift+Kl_F1,//3Fh	F6
+	Shift+Kl_F2,Shift+Kl_F2,//40h	F7
+	Shift+Kl_F3,Shift+Kl_F3,//41h	F8
+	Shift+Kl_F4,Shift+Kl_F4,//42h	F9
+	Shift+Kl_F5,Shift+Kl_F5,//43h	F10
 	0xFF,0xFF,				//44h	F11
 	0xFF,0xFF,				//45h	F12
 	0xFF,0xFF,				//46h	Print Screen -> RESET
@@ -381,7 +381,7 @@ uint8_t rk_get_key(uint8_t code, bool bOn, bool *pbAltTab)
 	{
 		do
 		{
-			if (code == HID_KEY_CAPS_LOCK)				/*39 Caps Lock  */
+			if (code == KBD_MOD_ALT)				/*39 Caps Lock  */
 				ledCapsLock = !ledCapsLock; // тригер  Caps lock
 			else if (code == HID_KEY_NUM_LOCK)
 				ledNumLock = !ledNumLock; // тригер  Caps lock
@@ -416,34 +416,35 @@ uint8_t rk_get_key(uint8_t code, bool bOn, bool *pbAltTab)
 extern volatile uint8_t kbdMatr[8];// = {255,255,255,255,255,255,255,255};
 extern volatile uint8_t portC;// = 0xF0; 
 
-void rk_key(uint8_t code, bool bOn) // клавиша нажата/отпущена
+void __noinline rk_key(uint8_t code, bool bOn) // клавиша нажата/отпущена
 {
-	if (code>=KBD_MOD_ALT)
-		return;
+	// if (code>=KBD_MOD_ALT)
+	// 	return;
 	bool bAltTab = false;
 	uint8_t key = rk_get_key(code, bOn, &bAltTab);
 	if (key == Kl_NOKEY && code < KBD_MOD_ALT)
 		return;
 	uint8_t row = /* 7 -  */(key >> 3) & 7; // Row
 	uint8_t col = key & 7;	 // Column
-	bool bShift = (key & Shift) != 0;
-	if (!bAltTab)
-		bShift = bShift || tab_key[KBD_MOD_SHIFT] != 0;
-	bool bCtrl = (key & Ctrl)!=0;
-	bool bRusLat = tab_key[HID_KEY_CAPS_LOCK] != 0;
-	if (!bAltTab)
-		bCtrl = bCtrl || tab_key[KBD_MOD_CTRL] == 1;
+	bool bShift = tab_key[KBD_MOD_SHIFT] != 0;
+	bool bCtrl = tab_key[KBD_MOD_CTRL] != 0;
+	bool bRusLat = tab_key[KBD_MOD_ALT] != 0;
+	
+	if (bOn)
+	{
+		bShift = bShift || (key != Kl_NOKEY && (key & Shift) != 0);
+		bCtrl = bCtrl || (key != Kl_NOKEY && (key & Ctrl)!=0);
+	}
+	portC = 0xE0 & ~((bCtrl ? Kl_Ctrl : 0) | (bShift ? Kl_Shift : 0) | (bRusLat ? Kl_RusLat : 0));
 	if (bOn)
 	{
 		if (code < KBD_MOD_ALT)
 			kbdMatr[row] &= ~(1 << col);
-		portC &= ~((bCtrl ? Kl_Ctrl : 0) | (bShift ? Kl_Shift : 0) | (bRusLat ? Kl_RusLat : 0));
 	}
 	else
 	{
 		if (code < KBD_MOD_ALT)
 			kbdMatr[row] |= (1 << col);
-		portC |= ((bCtrl ? Kl_Ctrl : 0) | (bShift ? Kl_Shift : 0) | (bRusLat ? Kl_RusLat : 0));
 	}
 	updateTX();
 }
