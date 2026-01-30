@@ -110,12 +110,12 @@ uint8_t tab_key_old[128] = {0x00}; // таблица предыдушего на
 #define Kl_9	A3+D1	// 9
 #define Kl_DVT	A3+D2	// : двоеточие
 #define Kl_PLS	A3+D3	// ;/+ PLUS
-#define Kl_ZPT	A3+D4	// , запятая
+#define Kl_COMMA	A3+D4	// , запятая
 #define Kl_MNS	A3+D5	// =/- МИНУС
-#define Kl_TCK	A3+D6	// . точка
-#define Kl_DEV	A3+D7	// / деление
+#define Kl_DOT	A3+D6	// . точка
+#define Kl_DIV	A3+D7	// / ? деление
 
-#define Kl_AMP	A4+D0	// @ амперсант
+#define Kl_AMP	A4+D0	// @ амперсанд
 #define Kl_A	A4+D1
 #define Kl_B	A4+D2
 #define Kl_C	A4+D3
@@ -211,14 +211,14 @@ uint8_t tab_kbd[] = {				//	 vvv - а это клавиша IBM
 	AltTb+5,AltTb+5,		//2Eh	=/+
 	Kl_BL,Kl_H,				//2Fh	[/{
 	Kl_BR,Kl_BR,			//30h	]/}
-	Kl_OSL,Kl_OSL,			//31h	\/|
+	Kl_OSL,AltTb+13,		//31h	\/|
 	0xFF,0xFF,				//32h   #
 	AltTb,Kl_V,				//33h	;/:
-	AltTb+10,AltTb+10,		//34h	'/"
-	AltTb+7,AltTb+7,		//35h	 `/~ 
-	Kl_ZPT,Kl_B,			//36h	,/<
-	Kl_TCK,Kl_AMP,			//37h	./>
-	Kl_DEV,Kl_DEV,			//38h	//?
+	AltTb+10,AltTb+7,		//34h	'/"
+	0xFF,0xFF,				//35h	`/~ 
+	Kl_COMMA,Kl_B,			//36h	,/<
+	Kl_DOT,Kl_AMP,			//37h	./>
+	Kl_DIV,AltTb+26,		//38h	//?
 	0xFF,0xFF,				//39h	Caps Lock
 	Kl_F1,Kl_F1,			//3Ah 	F1
 	Kl_F2,Kl_F2,			//3Bh 	F2
@@ -281,16 +281,16 @@ uint8_t AltTab[]={
 	Kl_MNS,Kl_BS+Shift,		    // 4	2Dh	-/_
 	Kl_MNS+Shift, Kl_PLS+Shift,	// 5	2Eh	=/+
 	Kl_2,Kl_AMP,			    // 6	2Eh	2/@
-	Kl_AMP+Shift,Kl_KAV+Shift,	// 7	35h	 `/~ 
+	Kl_OSL,Kl_OSL,				// 7	35h	 `/~ 
 	Kl_6,Kl_KAV,			    // 8	23h	6/^
 	Kl_7,Kl_6+Shift,			// 9	24h	7/&
 	Kl_2+Shift,Kl_7+Shift,		//10	34h	'/"
 	Kl_PLS+Shift,Kl_PLS+Shift,	//11	57h	[+]
 	Kl_DVT+Shift,Kl_DVT+Shift,	//12	55h	[*]
-	Kl_DEV,Kl_DEV,			    //13	54h	[/]
+	Kl_DIV,Kl_DIV,			    //13	54h	[/]
 	Kl_MNS,Kl_MNS,			    //14	56h [-]
 	Kl_0,Kl_0,			        //15	62h	[0]
-	Kl_TCK,Kl_TCK,			    //16	63h	[.]
+	Kl_DOT,Kl_DOT,			    //16	63h	[.]
 	Kl_2,Kl_2,			        //17	5Ah	[2]
 	Kl_5,Kl_5,			        //18	5Dh	[5]
 	Kl_6,Kl_6,			        //19	5Eh	[6]
@@ -300,6 +300,7 @@ uint8_t AltTab[]={
 	Kl_1,Kl_1,			        //23	59h	[1]
 	Kl_4,Kl_4,			        //24	5Ch	[4]
 	Kl_7,Kl_7,			        //25	5Fh	[7]
+	Kl_DOT, Kl_COMMA,			//26	38h	//?    
 };
 
 //--------------------------------------------
@@ -314,13 +315,13 @@ uint8_t AltTab2[]={
 	Kl_MNS,Kl_BS+Shift,		    // 4	2Dh	-/_
 	Kl_MNS+Shift, Kl_PLS+Shift,	// 5	2Eh	=/+
 	Kl_2,Kl_AMP,			    // 6	2Eh	2/@
-	Kl_AMP+Shift,Kl_KAV+Shift,	// 7	35h	 `/~ 
+	Kl_OSL,Kl_OSL,				// 7	35h	 `/~ 
 	Kl_6,Kl_KAV,			    // 8	23h	6/^
 	Kl_7,Kl_6+Shift,			// 9	24h	7/&
 	Kl_2+Shift,Kl_7+Shift,		//10	34h	'/"
 	Kl_PLS+Shift,Kl_PLS+Shift,	//11	57h	[+]
 	Kl_DVT+Shift,Kl_DVT+Shift,	//12	55h	[*]
-	Kl_DEV,Kl_DEV,			    //13	54h	[/]
+	Kl_DIV,Kl_DIV,			    //13	54h	[/]
 	Kl_MNS,Kl_MNS,			    //14	56h [-]
 	A0+D1,A0+D1,		        //15	62h	[0] [Ins] = ПС
 	Kl_F4,Kl_F4,			    //16	63h	[.] [Del] = F4
@@ -333,6 +334,7 @@ uint8_t AltTab2[]={
 	Ctrl+Kl_RGT,Ctrl+Kl_RGT,    //23	59h	[1] [End]
 	Kl_LFT,Kl_LFT,		        //24	5Ch	[4] [Left]
 	Ctrl+Kl_LFT,Ctrl+Kl_LFT,    //25	5Fh	[7] [Home]
+	Kl_DOT, Kl_COMMA,			//26	38h	//?    
 };
 //********************************************
 uint8_t rk_matrix[8] = {0};
@@ -432,8 +434,16 @@ void __noinline rk_key(uint8_t code, bool bOn) // клавиша нажата/о
 	
 	if (bOn)
 	{
-		bShift = bShift || (key != Kl_NOKEY && (key & Shift) != 0);
-		bCtrl = bCtrl || (key != Kl_NOKEY && (key & Ctrl)!=0);
+		if (bAltTab)
+		{
+			bShift = (key != Kl_NOKEY && (key & Shift) != 0);
+			bCtrl =  (key != Kl_NOKEY && (key & Ctrl)!=0);
+		}
+		else
+		{
+			bShift = bShift || (key != Kl_NOKEY && (key & Shift) != 0);
+			bCtrl = bCtrl || (key != Kl_NOKEY && (key & Ctrl)!=0);
+		}
 	}
 	portC = 0xE0 & ~((bCtrl ? Kl_Ctrl : 0) | (bShift ? Kl_Shift : 0) | (bRusLat ? Kl_RusLat : 0));
 	if (bOn)
