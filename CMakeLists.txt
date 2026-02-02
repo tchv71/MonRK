@@ -17,14 +17,8 @@ else()
 endif()
 set(sdkVersion 2.2.0)
 set(toolchainVersion 14_2_Rel1)
-set(picotoolVersion 2.2.0)
+set(picotoolVersion 2.2.0-a4)
 set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
-add_compile_options(
-    -DPICO_STDIO_ENABLE_CRLF_SUPPORT=0
-    -DPICO_STDIO_USB_CONNECTION_WITHOUT_DTR=1
-    -DCFG_TUSB_CONFIG_FILE=\"./tusb_config.h\"
-    #-DPICO_STDIO_USB_RESET_INTERFACE_SUPPORT_MS_OS_20_DESCRIPTOR=0
-)
 if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()

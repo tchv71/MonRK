@@ -39,7 +39,7 @@
 #define STA_OK_BLOCK 0x4F
 
 __attribute__((aligned(4))) BYTE buf[1024+512];
-__attribute__((aligned(4))) BYTE rom[128];
+__attribute__((aligned(4))) BYTE rom[512];
 #define flash
 
 /*******************************************************************************

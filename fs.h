@@ -34,7 +34,7 @@ Version 1.0 10-05-2014
 /* #define FS_DISABLE_GETFREESPACE */
 
 // Что бы компилятор поставил эту переменную первой в памяти
-extern BYTE rom[128];
+extern BYTE rom[512];
 
 /* Work buffer for filesystem */
 /* Буфер для работы файловой системы */
