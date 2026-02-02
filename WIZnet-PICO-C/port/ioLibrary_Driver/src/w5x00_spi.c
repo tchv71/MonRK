@@ -274,7 +274,7 @@ void wizchip_initialize(void)
     } while (temp == PHY_LINK_OFF);
 }
 
-void wizchip_check(void)
+bool wizchip_check(void)
 {
 #if (_WIZCHIP_ == W5100S)
     /* Read version register */
@@ -289,11 +289,13 @@ void wizchip_check(void)
     /* Read version register */
     if (getVERSIONR() != 0x04)
     {
-        printf(" ACCESS ERR : VERSION != 0x04, read value = 0x%02x\n", getVERSIONR());
-        panic("Init net");
-        while (1)
-            ;
+        //printf(" ACCESS ERR : VERSION != 0x04, read value = 0x%02x\n", getVERSIONR());
+        //panic("Init net");
+        //while (1)
+            //;
+        return false;
     }
+    return true;
 #endif
 }
 

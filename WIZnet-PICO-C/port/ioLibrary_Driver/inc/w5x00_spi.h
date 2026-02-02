@@ -179,7 +179,7 @@ void wizchip_initialize(void);
  *
  *  \param none
  */
-void wizchip_check(void);
+bool wizchip_check(void);
 
 /* Network */
 /*! \brief Initialize network

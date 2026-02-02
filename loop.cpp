@@ -80,7 +80,7 @@ volatile bool bEvent = false;
 #endif
 //volatile uint8_t rowMask = 0xff;
 uint32_t __a;
-volatile uint8_t __aligned(8) kbdMatr[8] = {255,255,255,255,255,255,255,255};
+volatile uint8_t __aligned(8) kbdMatr[9] = {255,255,255,255,255,255,255,255,255};
 volatile uint8_t portA = 0;
 volatile uint8_t portC = 0xE0; 
 volatile uint8_t portB = 0xFF; 
@@ -294,9 +294,11 @@ void networkInit()
     wizchip_cris_initialize();
 
     wizchip_reset();
-    wizchip_initialize();
-    wizchip_check();
-
+    do
+    {
+        wizchip_initialize();
+    } while (!wizchip_check());
+    
     network_initialize(g_net_info);
     uint8_t res = socket(s, Sn_MR_TCP, SOCKET_PORT, 0);
 
