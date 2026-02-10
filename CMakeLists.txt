@@ -44,7 +44,7 @@ target_sources(MonRk PRIVATE main.cpp
  loop.cpp sd.c 86rksd.c fs.c proto.c WIZnet-PICO-C/port/ioLibrary_Driver/src/w5x00_spi.c usb_msc_driver.c
  cpmfs.c device.c scancode_rk.c ws2812.c 
 )
-add_compile_definitions(PICO_STACK_SIZE=0x2000)
+add_compile_definitions(PICO_STACK_SIZE=0x4000)
 pico_set_linker_script(MonRk ${CMAKE_SOURCE_DIR}/memmap_custom.ld)
 
 pico_set_program_name(MonRk "MonRK")

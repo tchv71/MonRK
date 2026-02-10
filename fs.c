@@ -1609,7 +1609,7 @@ BYTE fs_gettotal()
  *  Размер файла                                                           *
  **************************************************************************/
 
-BYTE fs_getfilesize()
+BYTE __no_inline_not_in_flash_func(fs_getfilesize)()
 {
 #ifndef FS_DISABLE_CHECK
   if (fs_file.opened != OPENED_FILE)

@@ -71,7 +71,7 @@ void __not_in_flash_func(pio_irq_handler_write)()
 
 extern "C" const uint dmaRomSm;
 
-#ifndef KBD_EMU
+#if 0 //ndef KBD_EMU
 volatile uint16_t addr = 0;
 static uint16_t lastAddr = 0;
 static uint16_t lastAddr2 = 0;
@@ -104,7 +104,7 @@ void __not_in_flash_func(pio_irq_handler_rom)()
     uint8_t v_val = (val & (GPIO_CD_MASK << 4)) >> (PIN_CD7 + 4);
     switch (w_addr)
     {
-#ifdef KBD_EMU
+#if 1//def KBD_EMU
     case 0:
         portA = v_val;
         updateTX();
@@ -145,7 +145,7 @@ void __not_in_flash_func(pio_irq_handler_rom)()
         break;
     }
     v55_buf[w_addr] = v_val;
-#ifndef KBD_EMU
+#if 0 //ndef KBD_EMU
     if (bStopRomEmu)
         return;
 #if 1
@@ -351,7 +351,6 @@ void networkInit()
 
     /* Get network information */
     // print_network_information(g_net_info);
-    multicore_fifo_pop_blocking();
 }
 
 // const uint16_t DATA_BUF_SIZE = sizeof(streamInBuf);
@@ -501,6 +500,7 @@ void __not_in_flash_func(loop)()
         outLength = 0xFF;
     }
 
+#endif
     if (bFlushOutBuffer && bufOut.getSize() > 0)
     {
         uint16_t len;
@@ -537,5 +537,4 @@ void __not_in_flash_func(loop)()
 #endif
         bFlushOutBuffer = false;
     }
-#endif
 }

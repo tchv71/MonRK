@@ -24,6 +24,9 @@
 #include "scancode_rk.h"
 #include "ws2812.h"
 #include "init.h"
+#include "hardware/structs/ioqspi.h"
+#include "hardware/structs/sio.h"
+
 
 #define LEDBR 12
 
@@ -116,23 +119,13 @@ extern void __not_in_flash_func(pio_irq_handler_rom)();
 extern CircBuffer<10 * 1024> bufIn;
 extern CircBuffer<1024> bufOut;
 
-/*
- * Set up PIOs for pico <-> CPU interface
- */
-void fifoPioInit()
-{
-    bufIn.clear();
-    bufOut.clear();
+int fifoReadProgOffset = 0;
+int romProgramOffset = 0;
 
-    for (uint i = 0; i < 8; ++i)
-    {
-        pio_gpio_init(FIFO_PIO, PIN_CD7 + i);
-        gpio_set_drive_strength(PIN_CD7 + i, GPIO_DRIVE_STRENGTH_12MA);
-    }
-    pio_gpio_init(FIFO_PIO, PIN_DIR);
-#if USE_SERIAL_DEBUG
+void loadFifoReadProgram()
+{
     pio_sm_claim(FIFO_PIO, fifoReadSm);
-    int fifoReadProgOffset = pio_add_program(FIFO_PIO, &fifoRead_program);
+    fifoReadProgOffset = pio_add_program(FIFO_PIO, &fifoRead_program);
     if (fifoReadProgOffset < 0)
         panic("Failed add fifoReadProgram");
 
@@ -159,6 +152,32 @@ void fifoPioInit()
     pio_sm_set_enabled(FIFO_PIO, fifoReadSm, true);
     // updateFifoReadAhead();
 
+#if 0
+    pio_sm_claim(FIFO_PIO, dmaRomSm);
+    PIO pio = FIFO_PIO;
+    uint irq = PIO0_IRQ_0;
+    romProgramOffset = pio_add_program(pio, &rom2_program);
+    if (romProgramOffset < 0)
+        panic("Failed add fifoReadProgram");
+    pio_sm_config romConfig = rom2_program_get_default_config(romProgramOffset);
+    sm_config_set_in_pins(&romConfig, PIN_A0);
+    sm_config_set_sideset_pin_base(&romConfig, PIN_DIR);
+    sm_config_set_out_pins(&romConfig, PIN_CD7, 8);
+#define SH_LEFT false
+#define SH_RIGHT true
+    sm_config_set_in_shift(&romConfig, SH_LEFT, false, 32);   // L shift
+    sm_config_set_out_shift(&romConfig, SH_RIGHT, false, 32); // R shift
+    sm_config_set_clkdiv(&romConfig, 1.0f);
+
+    pio_sm_init(pio, dmaRomSm, romProgramOffset, &romConfig);
+    pio_sm_set_enabled(pio, dmaRomSm, true /* false */);
+#endif
+}
+
+
+
+void loadFifoWriteProgram()
+{
     /* fifoWriteProg */
     pio_sm_claim(DMA_PIO, fifoWrite2Sm);
     int fifoWriteProgOffset = pio_add_program(DMA_PIO, &fifoWrite_program);
@@ -174,7 +193,25 @@ void fifoPioInit()
     pio_set_irq1_source_enabled(DMA_PIO, pis_sm1_rx_fifo_not_empty, true);
     irq_set_exclusive_handler(PIO1_IRQ_1, pio_irq_handler_write);
     irq_set_enabled(PIO1_IRQ_1, true);
+}
+/*
+ * Set up PIOs for pico <-> CPU interface
+ */
+void fifoPioInit()
+{
+    bufIn.clear();
+    bufOut.clear();
+
+    for (uint i = 0; i < 8; ++i)
+    {
+        pio_gpio_init(FIFO_PIO, PIN_CD7 + i);
+        gpio_set_drive_strength(PIN_CD7 + i, GPIO_DRIVE_STRENGTH_12MA);
+    }
+    pio_gpio_init(FIFO_PIO, PIN_DIR);
+#if USE_SERIAL_DEBUG
+    loadFifoReadProgram();
 #endif
+    loadFifoWriteProgram();
 }
 /*
  * Set up PIOs for pico <-> CPU interface
@@ -182,15 +219,12 @@ void fifoPioInit()
  * DMA pio for write-like due to the same used pins
  */
 extern void __not_in_flash_func(updateTX)();
-
-void dmaPioInit()
+void loadKbdProgram()
 {
-#if !USE_DMA || KBD_EMU
-    // DMA Read  = SD  -> Mem
-    // DMA Write = Mem -> SD
+    pio_sm_claim(FIFO_PIO, dmaRomSm);
     PIO pio = FIFO_PIO;
     uint irq = PIO0_IRQ_0;
-    int romProgramOffset = pio_add_program(pio, &rom_program);
+    romProgramOffset = pio_add_program(pio, &rom_program);
     if (romProgramOffset < 0)
         panic("Failed add fifoReadProgram");
     pio_sm_clear_fifos(pio, dmaRomSm);
@@ -213,6 +247,14 @@ void dmaPioInit()
     pio_sm_set_enabled(pio, dmaRomSm, true /* false */);
     enable_interrupts();
     updateTX();
+}
+
+void dmaPioInit()
+{
+#if !USE_DMA || KBD_EMU
+    // DMA Read  = SD  -> Mem
+    // DMA Write = Mem -> SD
+    loadKbdProgram();
 #endif
 #if USE_DMA
     uint dmaWriteProgOffset = pio_add_program(DMA_PIO, &dmaWrite_program);
@@ -255,6 +297,83 @@ void dmaPioInit()
 #endif
 }
 
+
+// Picoboard has a button attached to the flash CS pin, which the bootrom
+// checks, and jumps straight to the USB bootcode if the button is pressed
+// (pulling flash CS low). We can check this pin in by jumping to some code in
+// SRAM (so that the XIP interface is not required), floating the flash CS
+// pin, and observing whether it is pulled low.
+//
+// This doesn't work if others are trying to access flash at the same time,
+// e.g. XIP streamer, or the other core.
+
+bool __no_inline_not_in_flash_func(get_bootsel_button)() {
+#if 0
+    const uint CS_PIN_INDEX = 1;
+
+    // Must disable interrupts, as interrupt handlers may be in flash, and we
+    // are about to temporarily disable flash access!
+    uint32_t flags = save_and_disable_interrupts();
+
+    // Set chip select to Hi-Z
+    hw_write_masked(&ioqspi_hw->io[CS_PIN_INDEX].ctrl,
+                    GPIO_OVERRIDE_LOW << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
+                    IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
+
+    // Note we can't call into any sleep functions in flash right now
+    for (volatile int i = 0; i < 1000; ++i);
+
+    // The HI GPIO registers in SIO can observe and control the 6 QSPI pins.
+    // Note the button pulls the pin *low* when pressed.
+#if PICO_RP2040
+    #define CS_BIT (1u << 1)
+#else
+    #define CS_BIT SIO_GPIO_HI_IN_QSPI_CSN_BITS
+#endif
+    bool button_state = !(sio_hw->gpio_hi_in & CS_BIT);
+
+    // Need to restore the state of chip select, else we are going to have a
+    // bad time when we return to code in flash!
+    hw_write_masked(&ioqspi_hw->io[CS_PIN_INDEX].ctrl,
+                    GPIO_OVERRIDE_NORMAL << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
+                    IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
+
+    restore_interrupts(flags);
+#else
+    gpio_set_dir(PIN_LED, GPIO_IN);
+    //sleep_ms(10);
+    for (volatile int i = 0; i < 1000; ++i);
+    bool button_state = gpio_get(PIN_LED);
+    gpio_set_dir(PIN_LED, GPIO_OUT);
+#endif
+    return button_state;
+}
+
+#ifdef KBD_EMU
+bool bKbdEmu = true;
+#else
+bool bKbdEmu = false;
+#endif
+
+
+void switchConfig()
+{
+    bKbdEmu = !bKbdEmu;
+    if (bKbdEmu)
+    {
+        //pio_remove_program_and_unclaim_sm( &rom2_program, FIFO_PIO, dmaRomSm, romProgramOffset);
+        pio_remove_program_and_unclaim_sm( &fifoRead_program, FIFO_PIO, fifoReadSm, fifoReadProgOffset);
+        loadKbdProgram();
+
+    }
+    else
+    {
+        pio_remove_program_and_unclaim_sm( &rom_program, FIFO_PIO, dmaRomSm, romProgramOffset);
+        loadFifoReadProgram();
+    }
+    LedUpdate();
+}
+
 void setup1()
 {
     spi_init(_SPI, BAUD);
@@ -291,27 +410,20 @@ void setup1()
 
     gpio_init(PIN_LED);
     gpio_set_dir(PIN_LED, GPIO_OUT);
-    gpio_put(PIN_LED, 0);
-
+    //gpio_put(PIN_LED, 0);
+    LedOff();
     // SD cards' DO MUST be pulled up.
     gpio_pull_up(PIN_SPI_RX);
-
-    dmaPioInit();
 }
 
-void loop1()
-{
-    main_sd();
-}
 
 void main1()
 {
-    if (setup1)
-        setup1();
+    // if (setup1)
+    setup1();
     while (true)
     {
-        if (loop1)
-            loop1();
+        main_sd();
     }
 }
 
@@ -331,46 +443,51 @@ void setup()
     gpio_set_drive_strength(PIN_DIR, GPIO_DRIVE_STRENGTH_12MA);
     gpio_pull_up(PIN_CD7);
 
+    dmaPioInit();
     fifoPioInit();
-    pio_sm_claim(FIFO_PIO, dmaRomSm);
-    // serial.ignoreFlowControl();
 #if USE_ETHERNET
     networkInit();
 #endif
+    multicore_fifo_push_blocking(0);
 }
 
 #define PICO_CLOCK_PLL 1260000000
 #define PICO_CLOCK_PLL_DIV1 5
 #define PICO_CLOCK_PLL_DIV2 1
 
-#ifdef KBD_EMU
 ///////////////////////////////////////////////////////////////////////////////////////////////
 //------------------------------------------------------------------------------
 uint8_t type_hid = 0;
 //------------------------------------------------------------------------------
-// mouse
-uint8_t mouse_x = 0xff;
-uint8_t mouse_y = 0xff;
-uint8_t mouse_b = 0xff; //#FADF - поpт  кнопок
-uint8_t joy_k = 0xff;
-
-volatile int8_t mouseDirectionX = 0;    // X direction (0 = decrement, 1 = increment)
-volatile int8_t mouseEncoderPhaseX = 0; // X Quadrature phase (0-3)
-
-volatile int8_t mouseDirectionY = 0;    // Y direction (0 = decrement, 1 = increment)
-volatile int8_t mouseEncoderPhaseY = 0; // Y Quadrature phase (0-3)
-
-volatile int16_t mouseDistanceX = 0; // Distance left for mouse to move
-volatile int16_t mouseDistanceY = 0; // Distance left for mouse to move
-//------------------------------------------------------------------------------
 // void mouse(uint8_t const *report, uint16_t len )
 void mouse(hid_mouse_report_t const *report, uint16_t len)
-
 {
   // debug_print("B=%02X X=%02d Y=%02d #1F=%02X        %02X\r\n", mouse_b, mouse_x, mouse_y, joy_k ,type_hid );
 }
 //------------------------------------------------------------------
 
+int x = 0, y = 0;
+
+static void process_mouse_report(hid_mouse_report_t const * report)
+{
+	static hid_mouse_report_t prev_report = { 0 };
+
+	// Mouse position.
+	//printf("Mouse: (%d %d %d)", report->x, report->y, report->wheel);
+
+	// Button state.
+    x += report->x;
+    y += report->y;
+	uint8_t button_changed_mask = report->buttons ^ prev_report.buttons;
+	if(button_changed_mask & report->buttons) {
+		// printf(" %c%c%c",
+		//        report->buttons & MOUSE_BUTTON_LEFT   ? 'L' : '-',
+		//        report->buttons & MOUSE_BUTTON_MIDDLE ? 'M' : '-',
+		//        report->buttons & MOUSE_BUTTON_RIGHT  ? 'R' : '-');
+	}
+    prev_report = *report;
+	//printf("\n");
+}
 //-----------------------------------------------------------------------------
 // Вызывается при получении отчета от устройства через конечную точку прерывания
 // Примечание: если есть идентификатор отчета (составной), то это 1-й байт отчета
@@ -387,10 +504,12 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 
   case HID_ITF_PROTOCOL_MOUSE: // mouse(report, len);break;
   {
+      process_mouse_report((hid_mouse_report_t const *)report);
+      break;
   }
   default:
-    break; // gamepad (report,len);break;
-           // continue to request to receive report
+      break; // gamepad (report,len);break;
+             // continue to request to receive report
   }
   if (!tuh_hid_receive_report(dev_addr, instance))
       panic("Error: cannot request to receive report\r\n");
@@ -455,7 +574,8 @@ void tuh_hid_umount_cb(uint8_t daddr, uint8_t instance)
 
   ws2812_set_rgb(LEDBR, 0, 0);
 }
-#endif
+
+uint32_t lastTimestamp = to_ms_since_boot(get_absolute_time());
 
 int main()
 {
@@ -468,7 +588,7 @@ int main()
 
     multicore_launch_core1(main1);
     setup();
-#ifdef KBD_EMU
+#if 1//def KBD_EMU
     tusb_init(); // инициализация USB OTG
     kb_update_leds();
 #endif
@@ -476,8 +596,23 @@ int main()
     {
         //tight_loop_contents();
         loop();
-#ifdef KBD_EMU
+//#ifdef KBD_EMU
         tuh_task();
-#endif
+//#endif
+        uint32_t timestamp = to_ms_since_boot(get_absolute_time());
+        if ((timestamp - lastTimestamp) > 50)
+        {
+            bool bButton = false;
+            bButton = get_bootsel_button();
+            static bool bLastButton = false;
+            if (bButton && !bLastButton)
+            {
+                MTX_ENTER();
+                switchConfig();
+                MTX_EXIT();
+            }
+            bLastButton = bButton;
+            lastTimestamp = timestamp;
+        }
     }
 }

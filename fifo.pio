@@ -94,6 +94,20 @@ s2:
   wait 1 gpio PIN_nCS2
 .wrap
 
+.program rom2
+;.define public PIN_nCS2 23
+.define public PIN_nRD 5
+.side_set 1 opt
+.wrap_target
+  mov osr, null       ; change CD0-7 pindirs to inputs
+  out pindirs, 8 side 1
+  wait 0 gpio PIN_nRD
+  mov OSR, !null
+  out pindirs, 8 side 0   ; set up CD0-7 as outputs
+  out pins, 8
+  wait 1 gpio PIN_nRD
+.wrap
+
 .program dmaRead
 .define public nDACK_PIN 5
 .define public nIOR_PIN  3

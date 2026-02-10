@@ -12,7 +12,7 @@
 
 #define CONST
 #define USE_DMA 1
-//#define KBD_EMU 1
+#define KBD_EMU 1
 #define USE_ETHERNET 1
 #define USE_SERIAL_DEBUG 1
 #ifdef KBD_EMU
@@ -32,6 +32,16 @@ extern recursive_mutex_t sd_mutex2;
 #define MTX_TRY_ENTER() recursive_mutex_try_enter(&sd_mutex2, NULL)
 #define MTX_EXIT() recursive_mutex_exit(&sd_mutex2)
 extern volatile uint8_t v55_buf[4];
+
+extern bool bKbdEmu;
+extern bool lastLedVal;
+
+#define LedUpdate() gpio_put(PIN_LED, lastLedVal^(!bKbdEmu))  
+#define Led(value)  lastLedVal = value; LedUpdate()
+#define LedOff() Led(false)
+#define LedOn()  Led(true)
+
+
 #ifdef __cplusplus
 }
 #endif

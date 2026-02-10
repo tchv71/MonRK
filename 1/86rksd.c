@@ -20,7 +20,6 @@
 #include "pico/multicore.h"
 #include "pico/sync.h"
 
-
 #define O_OPEN 0
 #define O_CREATE 1
 #define O_MKDIR 2
@@ -38,7 +37,7 @@
 #define ERR_DATETIME 0x50
 #define STA_OK_BLOCK 0x4F
 
-__attribute__((aligned(4))) BYTE buf[1024+512];
+__attribute__((aligned(4))) BYTE buf[1024 + 512];
 __attribute__((aligned(4))) BYTE rom[512];
 #define flash
 
@@ -102,7 +101,7 @@ void readInt(char rks)
     // Расчет длины блока (выравниваем чтение на сектор)
     if (fs_tell())
       return;
-    
+
     readedLength = SEC_LEN - (fs_tmp % SEC_LEN);
     if (readedLength > readLength)
       readedLength = readLength;
@@ -131,9 +130,9 @@ void readInt(char rks)
 
       // Посылаем адрес загрузки
       sendByte(STA_OK_RKS);
-      sendWord(*(WORD*)buf);
+      sendWord(*(WORD *)buf);
 #if !USE_DMA
-      sendByte (STA_WAIT);
+      sendByte(STA_WAIT);
 #endif
       // Корректируем указатели
       wptr += 4;
@@ -161,8 +160,8 @@ void readInt(char rks)
 #if USE_DMA
     dma_send(wptr, readedLength);
 #else
-    sendBin (wptr, readedLength);
-    sendByte (STA_WAIT);
+    sendBin(wptr, readedLength);
+    sendByte(STA_WAIT);
 #endif
   }
 
@@ -181,7 +180,7 @@ void cmd_ver()
 
   // Версия + Производитель
   {
-    flash char *ver = "V1.1 (DMA SIMPLE)";
+    flash char *ver = "V1.1 (DMA SIMP)";
     sendBinf(ver, 16);
   }
 }
@@ -194,12 +193,12 @@ void cmd_boot_exec()
 {
   // Файл по умолчанию
 #if !USE_DMA
-    const char *bootSdbiosRk = "boot/sdbios.rk";
+  const char *bootSdbiosRk = "boot/sdbios.rk";
 #else
-    const char *bootSdbiosRk = "boot/sdbiosds.rkl";
+  const char *bootSdbiosRk = "boot/sdbiosds.rkl";
 #endif
-    if (buf[0] == 0)
-      strcpy((char*) buf, /* (const char*) (nCS_GPIO_Port->IDR & nCS_Pin) ?  "boota/sdbios.rk" :  */bootSdbiosRk);
+  if (buf[0] == 0)
+    strcpy((char *)buf, /* (const char*) (nCS_GPIO_Port->IDR & nCS_Pin) ?  "boota/sdbios.rk" :  */ bootSdbiosRk);
 
   // Открываем файл
   MTX_ENTER();
@@ -238,7 +237,7 @@ void cmd_exec()
   // if ((nCS_GPIO_Port->IDR & nCS_Pin) && stricmp((char*)buf, "BOOT/SHELL.RK") == 0)
   //   strcpy((char*)buf, "BOOTA/SHELL.RK");
   // Режим передачи и подтверждение
-  sendStart (STA_WAIT);
+  sendStart(STA_WAIT);
   if (lastError)
     return; // Переполнение строки
 
@@ -275,7 +274,7 @@ void cmd_find()
 
   // Принимаем макс кол-во элементов
   n = recvWord();
-  //n = 1000;
+  // n = 1000;
 
   // MTX_ENTER();
   // sleep_ms(100);
@@ -328,11 +327,11 @@ void cmd_find()
     /* Отправляем */
     sendByte(STA_OK_ENTRY);
 #if !USE_DMA
-    sendBin ((BYTE*) &info, sizeof(info));
-    sendByte (STA_WAIT);
+    sendBin((BYTE *)&info, sizeof(info));
+    sendByte(STA_WAIT);
 #else
-    //sendBin ((BYTE*) &info, sizeof(info));
-    dma_send((BYTE*) &info, sizeof(info));
+    // sendBin ((BYTE*) &info, sizeof(info));
+    dma_send((BYTE *)&info, sizeof(info));
 #endif
   }
 
@@ -457,7 +456,7 @@ void cmd_lseek()
 
   // Передаем результат
   sendByte(STA_OK_CMD);
-  //sendBin((BYTE *)&fs_tmp, 4);
+  // sendBin((BYTE *)&fs_tmp, 4);
   sendWord(fs_tmp & 0xFFFF);
   sendWord(fs_tmp >> 16);
   lastError = 0; // На всякий случай, результат уже передан
@@ -554,53 +553,52 @@ void cmd_write()
 
 typedef struct
 {
-  uint8_t Hours;            /*!< Specifies the RTC Time Hour.
-                                 This parameter must be a number between Min_Data = 0 and Max_Data = 12 if the RTC_HourFormat_12 is selected
-                                 This parameter must be a number between Min_Data = 0 and Max_Data = 23 if the RTC_HourFormat_24 is selected */
+  uint8_t Hours; /*!< Specifies the RTC Time Hour.
+                      This parameter must be a number between Min_Data = 0 and Max_Data = 12 if the RTC_HourFormat_12 is selected
+                      This parameter must be a number between Min_Data = 0 and Max_Data = 23 if the RTC_HourFormat_24 is selected */
 
-  uint8_t Minutes;          /*!< Specifies the RTC Time Minutes.
-                                 This parameter must be a number between Min_Data = 0 and Max_Data = 59 */
+  uint8_t Minutes; /*!< Specifies the RTC Time Minutes.
+                        This parameter must be a number between Min_Data = 0 and Max_Data = 59 */
 
-  uint8_t Seconds;          /*!< Specifies the RTC Time Seconds.
-                                 This parameter must be a number between Min_Data = 0 and Max_Data = 59 */
+  uint8_t Seconds; /*!< Specifies the RTC Time Seconds.
+                        This parameter must be a number between Min_Data = 0 and Max_Data = 59 */
 
-  uint8_t TimeFormat;       /*!< Specifies the RTC AM/PM Time.
-                                 This parameter can be a value of @ref RTC_AM_PM_Definitions */
+  uint8_t TimeFormat; /*!< Specifies the RTC AM/PM Time.
+                           This parameter can be a value of @ref RTC_AM_PM_Definitions */
 
-  uint32_t SubSeconds;      /*!< Specifies the RTC_SSR RTC Sub Second register content.
-                                 This parameter corresponds to a time unit range between [0-1] Second
-                                 with [1 Sec / SecondFraction +1] granularity */
+  uint32_t SubSeconds; /*!< Specifies the RTC_SSR RTC Sub Second register content.
+                            This parameter corresponds to a time unit range between [0-1] Second
+                            with [1 Sec / SecondFraction +1] granularity */
 
-  uint32_t SecondFraction;  /*!< Specifies the range or granularity of Sub Second register content
-                                 corresponding to Synchronous prescaler factor value (PREDIV_S)
-                                 This parameter corresponds to a time unit range between [0-1] Second
-                                 with [1 Sec / SecondFraction +1] granularity.
-                                 This field will be used only by HAL_RTC_GetTime function */
+  uint32_t SecondFraction; /*!< Specifies the range or granularity of Sub Second register content
+                                corresponding to Synchronous prescaler factor value (PREDIV_S)
+                                This parameter corresponds to a time unit range between [0-1] Second
+                                with [1 Sec / SecondFraction +1] granularity.
+                                This field will be used only by HAL_RTC_GetTime function */
 
-  uint32_t DayLightSaving;  /*!< This interface is deprecated. To manage Daylight
-                                 Saving Time, please use HAL_RTC_DST_xxx functions */
+  uint32_t DayLightSaving; /*!< This interface is deprecated. To manage Daylight
+                                Saving Time, please use HAL_RTC_DST_xxx functions */
 
-  uint32_t StoreOperation;  /*!< This interface is deprecated. To manage Daylight
-                                 Saving Time, please use HAL_RTC_DST_xxx functions */
+  uint32_t StoreOperation; /*!< This interface is deprecated. To manage Daylight
+                                Saving Time, please use HAL_RTC_DST_xxx functions */
 } RTC_TimeTypeDef;
 
-
-
-//extern RTC_HandleTypeDef hrtc;
+// extern RTC_HandleTypeDef hrtc;
 
 static const uint8_t list_mth[12] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
 
-uint8_t Calendar_GetDayWeek (RTC_DateTypeDef thisDate)
+uint8_t Calendar_GetDayWeek(RTC_DateTypeDef thisDate)
 {
-	uint8_t ret = 0;
-    if(thisDate.Month < 3){
-    	thisDate.Year -= 1;
-    }
-    ret = (uint8_t)((thisDate.Year + (thisDate.Year/4) - (thisDate.Year/100) + (thisDate.Year/400) + list_mth[thisDate.Month-1] + thisDate.Date) % 7);
-	return (ret);
+  uint8_t ret = 0;
+  if (thisDate.Month < 3)
+  {
+    thisDate.Year -= 1;
+  }
+  ret = (uint8_t)((thisDate.Year + (thisDate.Year / 4) - (thisDate.Year / 100) + (thisDate.Year / 400) + list_mth[thisDate.Month - 1] + thisDate.Date) % 7);
+  return (ret);
 }
 
-void toDatetime(const RTC_DateTypeDef *rt, datetime_t * t)
+void toDatetime(const RTC_DateTypeDef *rt, datetime_t *t)
 {
   if (!t || !rt)
     return;
@@ -610,7 +608,7 @@ void toDatetime(const RTC_DateTypeDef *rt, datetime_t * t)
   t->year = rt->Year + 20000;
 }
 
-void toDatetimeT(const RTC_TimeTypeDef *rt, datetime_t * t)
+void toDatetimeT(const RTC_TimeTypeDef *rt, datetime_t *t)
 {
   if (!t || !rt)
     return;
@@ -619,24 +617,24 @@ void toDatetimeT(const RTC_TimeTypeDef *rt, datetime_t * t)
   t->hour = rt->Hours;
 }
 
-void toRTC_Date(const  datetime_t * t, RTC_DateTypeDef *rt)
+void toRTC_Date(const datetime_t *t, RTC_DateTypeDef *rt)
 {
   if (!t || !rt)
     return;
-  rt->Date    = t->day  ;
-  rt->Month   = t->month;
-  rt->WeekDay = t->dotw ;
-  rt->Year    = t->year - 2000 ;
+  rt->Date = t->day;
+  rt->Month = t->month;
+  rt->WeekDay = t->dotw;
+  rt->Year = t->year - 2000;
 }
 
-void toRTC_Time(const  datetime_t * t, RTC_TimeTypeDef *rt)
+void toRTC_Time(const datetime_t *t, RTC_TimeTypeDef *rt)
 {
   if (!t || !rt)
     return;
-  rt->Hours   = t->hour ;
+  rt->Hours = t->hour;
   rt->Minutes = t->min;
   rt->Seconds = t->sec;
-  rt->SecondFraction = 255 ;
+  rt->SecondFraction = 255;
   rt->SubSeconds = 0;
 }
 /*******************************************************************************
@@ -645,28 +643,26 @@ void toRTC_Time(const  datetime_t * t, RTC_TimeTypeDef *rt)
 void cmd_get_date()
 {
   sendStart(STA_WAIT);
-  RTC_DateTypeDef sDate={0};
+  RTC_DateTypeDef sDate = {0};
   datetime_t t;
   if (!rtc_get_datetime(&t))
   {
     lastError = ERR_DATETIME;
     return;
-
   }
   toRTC_Date(&t, &sDate);
-  sendBin((BYTE*)&sDate, sizeof(sDate));
+  sendBin((BYTE *)&sDate, sizeof(sDate));
   sendByte(STA_OK_CMD);
-  lastError = 0;//STA_OK_CMD;
+  lastError = 0; // STA_OK_CMD;
 }
-
 
 /*******************************************************************************
  * Установить дату                                                              *
  *******************************************************************************/
 void cmd_set_date()
 {
-  RTC_DateTypeDef sDate={0};
-  //recvStart();
+  RTC_DateTypeDef sDate = {0};
+  // recvStart();
   sDate.WeekDay = recvByte();
   sDate.Month = recvByte();
   sDate.Date = recvByte();
@@ -674,13 +670,12 @@ void cmd_set_date()
   sDate.WeekDay = Calendar_GetDayWeek(sDate);
 
   // Режим передачи и подтверждение
-  sendStart (STA_WAIT);
+  sendStart(STA_WAIT);
   datetime_t t;
   if (!rtc_get_datetime(&t))
   {
     lastError = ERR_DATETIME;
     return;
-
   }
   toDatetime(&sDate, &t);
 
@@ -689,8 +684,8 @@ void cmd_set_date()
     lastError = ERR_DATETIME;
     return;
   }
-  //send (STA_OK_CMD);
-   sendStart(STA_OK_CMD);
+  // send (STA_OK_CMD);
+  sendStart(STA_OK_CMD);
 }
 
 /*******************************************************************************
@@ -699,21 +694,20 @@ void cmd_set_date()
 void cmd_get_time()
 {
   sendStart(STA_WAIT);
-  RTC_TimeTypeDef sTime={0};
+  RTC_TimeTypeDef sTime = {0};
 
   datetime_t t;
   if (!rtc_get_datetime(&t))
   {
     lastError = ERR_DATETIME;
     return;
-
   }
   toRTC_Time(&t, &sTime);
-  sendBin((BYTE*)&sTime, 3);
-  sendBin((BYTE*)&sTime.SecondFraction,1);
-  sendBin((BYTE*)&sTime.SubSeconds,1);
+  sendBin((BYTE *)&sTime, 3);
+  sendBin((BYTE *)&sTime.SecondFraction, 1);
+  sendBin((BYTE *)&sTime.SubSeconds, 1);
   sendByte(STA_OK_CMD);
-  lastError = 0;//STA_OK_CMD;
+  lastError = 0; // STA_OK_CMD;
 }
 
 /*******************************************************************************
@@ -721,7 +715,7 @@ void cmd_get_time()
  *******************************************************************************/
 void cmd_set_time()
 {
-  RTC_TimeTypeDef sTime={0};
+  RTC_TimeTypeDef sTime = {0};
   sTime.Hours = recvByte();
   sTime.Minutes = recvByte();
   sTime.Seconds = recvByte();
@@ -732,7 +726,6 @@ void cmd_set_time()
   {
     lastError = ERR_DATETIME;
     return;
-
   }
   toDatetimeT(&sTime, &t);
 
@@ -741,15 +734,13 @@ void cmd_set_time()
     lastError = ERR_DATETIME;
     return;
   }
-  //send (STA_OK_CMD);
+  // send (STA_OK_CMD);
   sendStart(STA_OK_CMD);
 }
-
 
 /*******************************************************************************
  * Главная процедура                                                            *
  *******************************************************************************/
-bool lastLedVal = false;
 
 void error()
 {
@@ -762,20 +753,22 @@ void error()
   }
 }
 
+bool lastLedVal;
 
-struct {
-uint8_t  WRITE_MODE;
-uint8_t  ARG_SELDISK;
-uint16_t ARG_TRACK;
-uint16_t ARG_SECTOR_128;
+struct
+{
+  uint8_t WRITE_MODE;
+  uint8_t ARG_SELDISK;
+  uint16_t ARG_TRACK;
+  uint16_t ARG_SECTOR_128;
 } a;
 const uint16_t ARG_SEC_ON_TRK = 80;
 uint16_t ARG_SECTOR_512;
-uint8_t  NEW_COUNT;
-uint8_t  NEW_DISK;
+uint8_t NEW_COUNT;
+uint8_t NEW_DISK;
 uint16_t NEW_TRACK;
 uint16_t NEW_SECTOR;
-int8_t   BUFFER_DISK = -1;
+int8_t BUFFER_DISK = -1;
 uint16_t BUFFER_TRACK;
 uint16_t BUFFER_SECTOR;
 BYTE BUFFER[512];
@@ -797,7 +790,7 @@ void cmd_bios_set_trk()
   a.ARG_TRACK = recvWord();
 }
 
-void  cmd_bios_set_sect()
+void cmd_bios_set_sect()
 {
   a.ARG_SECTOR_128 = recvByte();
 }
@@ -816,10 +809,9 @@ bool OpenDiskImage()
   return true;
 }
 
-
 bool DiskSeek()
 {
-  //trk*1024*5*2/256
+  // trk*1024*5*2/256
   DWORD off = BUFFER_TRACK * 1024 * 5 * 2 + BUFFER_SECTOR * 512;
   return fs_lseek(off, 0) == 0;
 }
@@ -975,8 +967,8 @@ void cmd_bios_wr_rect()
   sendByte(res ? STA_OK_CMD : ERR_DISK_ERR);
 }
 
-
-enum {
+enum
+{
   CMD_BIOS_HOME = 10,
   CMD_BIOS_SEL_DSK,
   CMD_BIOS_SET_TRK,
@@ -985,8 +977,7 @@ enum {
   CMD_BIOS_WR_RECT,
 };
 
-
-BYTE RkSd_Loop()
+BYTE __not_in_flash_func(RkSd_Loop())
 {
   BYTE c;
   // while (1)
@@ -994,13 +985,13 @@ BYTE RkSd_Loop()
     // Проверяем наличие карты
     sendStart(STA_START);
 #if !USE_DMA
-    sendByte (STA_WAIT);
+    sendByte(STA_WAIT);
 #endif
-    //if (fs_check ())
+    // if (fs_check ())
     //{
-    //  sendByte (ERR_DISK_ERR);
-    //}
-    //else
+    //   sendByte (ERR_DISK_ERR);
+    // }
+    // else
     {
       sendByte(STA_OK_DISK);
       recvStart();
@@ -1012,7 +1003,6 @@ BYTE RkSd_Loop()
       lastError = 0;
 
       //MTX_ENTER();
-
       // Принимаем аргументы
       switch (c)
       {
@@ -1061,11 +1051,9 @@ BYTE RkSd_Loop()
       case CMD_BIOS_RD_RECT:
         cmd_bios_rd_rect();
         break;
-       case CMD_BIOS_WR_RECT:
+      case CMD_BIOS_WR_RECT:
         cmd_bios_wr_rect();
         break;
-     
-#if 1
       case 0x2A:
         cmd_get_date();
         break;
@@ -1078,7 +1066,6 @@ BYTE RkSd_Loop()
       case 0x2D:
         cmd_set_time();
         break;
-#endif
       default:
         lastError = ERR_INVALID_COMMAND;
       }
@@ -1090,10 +1077,10 @@ BYTE RkSd_Loop()
         // if (lastError!=ERR_FILE_EXISTS)
         //   panic("error");
         sendStart(lastError);
-      } 
+      }
     }
 
-#if 0// !USE_DMA
+#if 0 // !USE_DMA
     // Порт работает на выход
     wait();
     DATA_OUT();
@@ -1105,7 +1092,7 @@ BYTE RkSd_Loop()
   }
 }
 
-//const uint dmaReadSm = 0;
+// const uint dmaReadSm = 0;
 const uint dmaWriteSm = 0;
 const uint dmaRomSm = 2;
 const uint dmaReadSm = 1;
@@ -1113,8 +1100,7 @@ const uint fifoReadSm = 0;
 const uint fifoWrite2Sm = 1;
 extern int res;
 
-
-volatile uint8_t v55_buf[4] = {0,0,0,0};
+volatile uint8_t v55_buf[4] = {0, 0, 0, 0};
 
 #if USE_DMA
 
@@ -1135,29 +1121,26 @@ static inline void WRITE_DATA(BYTE c)
   do
   {
     val = gpio_get_all();
-  }
-  while ((val & (nCS2_MASK | nRD_MASK))!=0);   
+  } while ((val & (nCS2_MASK | nRD_MASK)) != 0);
   gpio_set_dir_out_masked(GPIO_CD_MASK);
   gpio_put_masked(GPIO_CD_MASK, ((uint32_t)c) << PIN_CD7);
   do
   {
     val = gpio_get_all();
-  }
-  while ((val & (nCS2_MASK | nRD_MASK))==0);   
+  } while ((val & (nCS2_MASK | nRD_MASK)) == 0);
   gpio_set_dir_in_masked(GPIO_CD_MASK);
 }
 
-
 static __force_inline uint16_t __not_in_flash_func(READ_ADDR)()
 {
-  return *(uint16_t*)&v55_buf[1];// | (((uint32_t)v55_buf[2]) << 8);
+  return *(uint16_t *)&v55_buf[1]; // | (((uint32_t)v55_buf[2]) << 8);
 }
 
 bool bDir = false;
 
 #endif
 
-//void RkSd_main();
+// void RkSd_main();
 auto_init_mutex(sd_mutex);
 recursive_mutex_t sd_mutex2;
 
@@ -1166,24 +1149,24 @@ extern volatile bool bStopRomEmu;
 
 void __not_in_flash_func(EmulateRom)()
 {
-  while (!bStopRomEmu) ;
+  while (!bStopRomEmu)
+    ;
 }
 
-
 int res = 0;
-void  __not_in_flash_func(main_sd)()
+void __not_in_flash_func(main_sd)()
 {
+  busy_wait_ms(500);
+  multicore_fifo_pop_blocking();
   DATA_IN();
-  //busy_wait_ms(500);
-  multicore_fifo_push_blocking(0);
   LedOn();
   // Пауза, пока не стабилизируется питание
-  //sleep_ms(300);
+  // sleep_ms(300);
   // Запуск файловой системы
   if (fs_init())
     error();
-   {
-    //mutex_enter_blocking(&sd_mutex);
+  {
+    // mutex_enter_blocking(&sd_mutex);
     MTX_ENTER();
     strcpy(buf, "boot/boot.rk");
     if (fs_open())
@@ -1220,12 +1203,12 @@ void  __not_in_flash_func(main_sd)()
     }
 #endif
     }
-    //mutex_exit(&sd_mutex);
+    // mutex_exit(&sd_mutex);
     MTX_EXIT();
   }
-  //while (true) ;
+  // while (true) ;
 #if !USE_DMA
-   EmulateRom();
+  EmulateRom();
 #endif
   while (1)
   {
