@@ -608,7 +608,7 @@ uint8_t ftpd_run(uint8_t *dbuf)
 					}
 					else
 					{
-						if (getSn_SR(DATA_SOCK) != SOCK_ESTABLISHED)
+						//if (getSn_SR(DATA_SOCK) != SOCK_ESTABLISHED)
 							break;
 					}
 				}

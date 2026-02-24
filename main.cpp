@@ -466,18 +466,108 @@ void mouse(hid_mouse_report_t const *report, uint16_t len)
 }
 //------------------------------------------------------------------
 
-int x = 0, y = 0;
+/*
+ * Your mouse's polling rate.
+ * If you don't know what yours is, follow this link:
+ * https://wiki.archlinux.org/index.php/Mouse_polling_rate
+ */
+#define POLLING_RATE 125
 
-static void process_mouse_report(hid_mouse_report_t const * report)
+/*
+ * This should be your desired acceleration. It needs to end with an f.
+ * For example, setting this to "0.1f" should be equal to
+ * cl_mouseaccel 0.1 in Quake.
+ */
+#define ACCELERATION 0.2f
+
+#define SENSITIVITY 1.0f
+#define SENS_CAP 0.0f
+#define OFFSET 0.0f
+#define PRE_SCALE_X 1.0f
+#define PRE_SCALE_Y 1.0f
+#define POST_SCALE_X 1.0f
+#define POST_SCALE_Y 1.0f
+#define SPEED_CAP 0.0f
+
+
+
+static inline int Leet_round(float x)
+{
+	if (x >= 0) {
+		return (int)(x + 0.5f);
+	} else {
+		return (int)(x - 0.5f);
+	}
+}
+
+// What do we have here? Code from Quake 3, which is also GPL.
+// https://en.wikipedia.org/wiki/Fast_inverse_square_root
+// Copyright (C) 1999-2005 Id Software, Inc.
+static inline float Q_sqrt(float number)
+{
+	long i;
+	float x2, y;
+	const float threehalfs = 1.5F;
+
+	x2 = number * 0.5F;
+	y  = number;
+	i  = * ( long * ) &y;                       // evil floating point bit level hacking
+	i  = 0x5f3759df - ( i >> 1 );               // what the fuck?
+	y  = * ( float * ) &i;
+	y  = y * ( threehalfs - ( x2 * y * y ) );   // 1st iteration
+//	y  = y * ( threehalfs - ( x2 * y * y ) );   // 2nd iteration, this can be removed
+
+	return 1 / y;
+}
+
+
+static void __noinline process_mouse_report(hid_mouse_report_t const * report)
 {
 	static hid_mouse_report_t prev_report = { 0 };
 
 	// Mouse position.
 	//printf("Mouse: (%d %d %d)", report->x, report->y, report->wheel);
+	// acceleration happens here
+	float delta_x = report->x * PRE_SCALE_X;
+	float delta_y = report->y * PRE_SCALE_Y;
 
+#if 1
+	float ms = 1000.0f / POLLING_RATE;
+	float accel_sens = SENSITIVITY;
+	float rate = Q_sqrt(delta_x * delta_x + delta_y * delta_y);
+	static float carry_x = 0.0f;
+	static float carry_y = 0.0f;
+
+	if (SPEED_CAP != 0) {
+		if (rate >= SPEED_CAP) {
+			delta_x *= SPEED_CAP / rate;
+			delta_y *= SPEED_CAP / rate;
+		}
+	}
+	rate /= ms;
+	rate -= OFFSET;
+	if (rate > 0) {
+		rate *= ACCELERATION;
+		accel_sens += rate;
+	}
+	if (SENS_CAP > 0 && accel_sens >= SENS_CAP) {
+		accel_sens = SENS_CAP;
+	}
+	accel_sens /= SENSITIVITY;
+	delta_x *= accel_sens;
+	delta_y *= accel_sens;
+	delta_x *= POST_SCALE_X;
+	delta_y *= POST_SCALE_Y;
+	delta_x += carry_x;
+	delta_y += carry_y;
+	carry_x = delta_x - Leet_round(delta_x);
+	carry_y = delta_y - Leet_round(delta_y);
+#endif
 	// Button state.
-    x += report->x;
-    y += report->y;
+    mouseXAbs += Leet_round(delta_x);
+    mouseYAbs += Leet_round(delta_y);
+    mouseButtons = report->buttons;
+    updateTX();
 	uint8_t button_changed_mask = report->buttons ^ prev_report.buttons;
 	if(button_changed_mask & report->buttons) {
 		// printf(" %c%c%c",

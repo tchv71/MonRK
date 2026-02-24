@@ -303,7 +303,8 @@ int8_t disconnect(uint8_t sn)
 	while(getSn_CR(sn));
 	sock_is_sending &= ~(1<<sn);
    if(sock_io_mode & (1<<sn)) return SOCK_BUSY;
-	while(getSn_SR(sn) != SOCK_CLOSED)
+   uint8_t val;
+	while((val = getSn_SR(sn)) != SOCK_CLOSED)
 	{
 	   if(getSn_IR(sn) & Sn_IR_TIMEOUT)
 	   {

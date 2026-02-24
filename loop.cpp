@@ -79,11 +79,57 @@ volatile bool bStopRomEmu = false;
 volatile bool bEvent = false;
 #endif
 //volatile uint8_t rowMask = 0xff;
-uint32_t __a;
-volatile uint8_t __aligned(8) kbdMatr[9] = {255,255,255,255,255,255,255,255,255};
+
+const uint8_t PPI_MOUSE_MODE = 0x80;
+const uint8_t PPI_KBD_MODE = 0x8A;
+
+volatile uint8_t kbdMatr[9] = {255,255,255,255,255,255,255,255,255};
 volatile uint8_t portA = 0;
+volatile uint8_t portB = 0xFF;
 volatile uint8_t portC = 0xE0; 
-volatile uint8_t portB = 0xFF; 
+volatile uint8_t portCtrl = 0x8A; 
+
+uint8_t portASave = portA;
+uint8_t portBSave = portB;
+uint8_t portCSave = portC; 
+
+uint8_t mouseButtons = 0;
+int mouseXAbs = 0;
+int mouseYAbs = 0;
+int mouseXAbsOld = 0;
+int mouseYAbsOld = 0;
+const int mouseDiv = 1;//10;
+//const uint8_t ADDR_SHIFT = 0;
+
+bool bPpiKbdMode = true;
+
+void  inline (updateTX)()
+{
+    pio_sm_clear_fifos(FIFO_PIO, dmaRomSm);
+    if (!bPpiKbdMode)
+    {
+        int diffX = (mouseXAbs - mouseXAbsOld) / mouseDiv;
+        //if (diffX > 127) diffX = 127; else if (diffX<-127) diffX = -127;
+        int diffY = (mouseYAbs - mouseYAbsOld) / mouseDiv; 
+        //if (diffY > 127) diffY = 127; else if (diffY<-127) diffY = -127;
+        portA = diffX;
+        portB = diffY;
+        portC = mouseButtons;
+    }
+    else
+    {
+        portB = 0xff;
+        uint8_t mask = 1;
+        for (uint8_t i = 0; i < 8; ++i)
+        {
+            if (!(portA & mask))
+                portB &= kbdMatr[i];
+            mask = mask << 1;
+        }
+    }
+
+    pio_sm_put_blocking(FIFO_PIO, dmaRomSm, ((uint32_t)portCtrl << 24) |((uint32_t)portC << 16) | ((uint32_t)portB << 8) | (uint32_t)portA);
+}
 
 
 void __not_in_flash_func(pio_irq_handler_rom)()
@@ -97,6 +143,17 @@ void __not_in_flash_func(pio_irq_handler_rom)()
     uint8_t w_addr = (val & 3);
     if (!bWrite)
     {
+        if (!bPpiKbdMode)
+        {
+            if (w_addr == 0)
+                mouseXAbsOld = mouseXAbs - mouseXAbs % mouseDiv;
+            else if (w_addr == 1)
+                mouseYAbsOld = mouseYAbs - mouseYAbs % mouseDiv;
+            else
+                return;
+            updateTX();
+            return;
+        }
         if (w_addr==2)
          updateTX();
         return;
@@ -112,7 +169,22 @@ void __not_in_flash_func(pio_irq_handler_rom)()
     case 2:
         break;
     case 3:
-        if ((v_val & 0x80) == 0)
+        portCtrl = v_val;
+        if (v_val == PPI_MOUSE_MODE)
+        {
+            portASave = portA; portBSave = portB; portCSave = portC;
+            //portA = portB = portC = 0;
+
+            bPpiKbdMode = false;
+            updateTX();
+        }
+        else if (v_val == PPI_KBD_MODE)
+        {
+            portA = portASave; portB = portBSave; portC = portCSave;
+            bPpiKbdMode = true;
+            updateTX();
+        }
+        if ( bPpiKbdMode && (v_val & 0x80) == 0)
         {
             uint8_t bitNo = (v_val >> 1) & 7;
             if (v_val & 1)
