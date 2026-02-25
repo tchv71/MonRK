@@ -65,8 +65,6 @@ endPart:
   mov osr, null       ; change CD0-7 pindirs to inputs
   out pindirs, 8 side 1
   wait 0 gpio PIN_nCS2
-  pull noblock
-  mov x,OSR
   jmp pin, romRead ; PIN_nWR
   wait 1 gpio PIN_nWR
   jmp s1
@@ -75,12 +73,14 @@ rr01:
   jmp loop0
 romRead:
   mov isr, null
+  mov OSR, !null
   out pindirs, 8 side 0   ; set up CD0-7 as outputs
-rpt01:
-  in pins, 2
+  pull noblock
+  mov x,OSR
 
+  mov isr, null
+  in pins, 2
   mov y, isr
-  ;jmp !y, rpt01
 loop0:
   jmp y--, rr01
   out pins, 8

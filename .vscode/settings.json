@@ -64,5 +64,5 @@
         "cpmfs.h": "c",
         "w5x00_spi.h": "c"
     },
-    "cortex-debug.variableUseNaturalFormat": true
+    "cortex-debug.variableUseNaturalFormat": false
 }

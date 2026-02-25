@@ -103,7 +103,7 @@ const int mouseDiv = 1;//10;
 
 bool bPpiKbdMode = true;
 
-void  inline (updateTX)()
+void __no_inline_not_in_flash_func (updateTX)()
 {
     pio_sm_clear_fifos(FIFO_PIO, dmaRomSm);
     if (!bPpiKbdMode)

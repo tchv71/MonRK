@@ -1111,6 +1111,7 @@ const uint dmaRomSm = 2;
 const uint dmaReadSm = 1;
 const uint fifoReadSm = 0;
 const uint fifoWrite2Sm = 1;
+const uint dmaRomRdSm = 2;
 extern int res;
 
 
