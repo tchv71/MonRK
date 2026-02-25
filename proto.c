@@ -7,9 +7,6 @@
 
 void RkSd_Main();
 
-extern const uint dmaRomSm;
-
-
 #if !USE_DMA
 void DATA_BUS_OUT()
 {}
@@ -124,12 +121,6 @@ void __not_in_flash_func(sendWord)(WORD w)
 #endif
 }
 
-
-extern const uint dmaWriteSm;
-// const uint dmaRomSm = 2;
-// const uint dmaReadSm = 1;
-// const uint fifoReadSm = 0;
-// const uint fifoWrite2Sm = 1;
 
 #define INTS_OFF 0
 void __not_in_flash_func(dma_send)(const BYTE *ptr, WORD len)

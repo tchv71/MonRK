@@ -21,7 +21,6 @@ extern int mouseYAbs;
 extern int mouseXAbsOld;
 extern int mouseYAbsOld;
 
-extern const uint dmaRomSm;
 extern void updateTX();
 
 #ifdef __cplusplus

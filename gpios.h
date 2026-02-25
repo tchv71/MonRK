@@ -54,8 +54,4 @@ enum
 #define DMA_PIO pio1
 #define FIFO_IRQ PIO0_IRQ_0
 
-extern const uint fifoWriteSm;
-extern const uint fifoReadSm;
-extern const uint dmaReadSm;
-
 #endif

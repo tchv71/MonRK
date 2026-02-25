@@ -1106,16 +1106,8 @@ BYTE RkSd_Loop()
 }
 
 //const uint dmaReadSm = 0;
-const uint dmaWriteSm = 0;
-const uint dmaRomSm = 2;
-const uint dmaReadSm = 1;
-const uint fifoReadSm = 0;
-const uint fifoWrite2Sm = 1;
-const uint dmaRomRdSm = 2;
 extern int res;
 
-
-volatile uint8_t v55_buf[4] = {0,0,0,0};
 
 #if USE_DMA
 

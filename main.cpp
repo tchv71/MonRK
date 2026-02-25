@@ -109,13 +109,10 @@ static struct _reent *_impure_ptr1 = nullptr;
 
 extern "C" void main_sd();
 
-extern "C" const uint dmaWriteSm;
-extern "C" const uint dmaRomSm;
-extern const uint dmaReadSm;
-extern "C" const uint fifoWrite2Sm;
 
 extern void __not_in_flash_func(pio_irq_handler_write)();
-extern void __not_in_flash_func(pio_irq_handler_rom)();
+extern void __not_in_flash_func(pio_irq_handler_rom_wr)();
+extern void __not_in_flash_func(pio_irq_handler_rom_rd)();
 extern CircBuffer<10 * 1024> bufIn;
 extern CircBuffer<1024> bufOut;
 
@@ -191,8 +188,9 @@ void loadFifoWriteProgram()
     pio_sm_init(DMA_PIO, fifoWrite2Sm, fifoWriteProgOffset, &writeConfig2);
     pio_sm_set_enabled(DMA_PIO, fifoWrite2Sm, true);
     pio_set_irq1_source_enabled(DMA_PIO, pis_sm1_rx_fifo_not_empty, true);
-    irq_set_exclusive_handler(PIO1_IRQ_1, pio_irq_handler_write);
-    irq_set_enabled(PIO1_IRQ_1, true);
+    const uint irq = PIO1_IRQ_1;
+    irq_set_exclusive_handler(irq, pio_irq_handler_write);
+    irq_set_enabled(irq, true);
 }
 /*
  * Set up PIOs for pico <-> CPU interface
@@ -221,13 +219,13 @@ void fifoPioInit()
 extern void __not_in_flash_func(updateTX)();
 void loadKbdProgram()
 {
-    pio_sm_claim(FIFO_PIO, dmaRomSm);
+    pio_sm_claim(FIFO_PIO, dmaRomRdSm);
     PIO pio = FIFO_PIO;
     uint irq = PIO0_IRQ_0;
     romProgramOffset = pio_add_program(pio, &rom_program);
     if (romProgramOffset < 0)
         panic("Failed add fifoReadProgram");
-    pio_sm_clear_fifos(pio, dmaRomSm);
+    pio_sm_clear_fifos(pio, dmaRomRdSm);
 
     pio_sm_config romConfig = rom_program_get_default_config(romProgramOffset);
     sm_config_set_in_pins(&romConfig, PIN_A0);
@@ -240,11 +238,11 @@ void loadKbdProgram()
     sm_config_set_out_shift(&romConfig, SH_RIGHT, false, 32); // R shift
     sm_config_set_clkdiv(&romConfig, 1.0f);
 
-    pio_sm_init(pio, dmaRomSm, romProgramOffset, &romConfig);
+    pio_sm_init(pio, dmaRomRdSm, romProgramOffset, &romConfig);
     pio_set_irq0_source_enabled(pio, pis_sm2_rx_fifo_not_empty, true);
-    irq_set_exclusive_handler(irq, pio_irq_handler_rom);
+    irq_set_exclusive_handler(irq, pio_irq_handler_rom_rd);
     irq_set_enabled(irq, true);
-    pio_sm_set_enabled(pio, dmaRomSm, true /* false */);
+    pio_sm_set_enabled(pio, dmaRomRdSm, true /* false */);
     enable_interrupts();
     updateTX();
 }
@@ -295,6 +293,25 @@ void dmaPioInit()
     pio_sm_init(FIFO_PIO, dmaReadSm, dmaReadProgOffset, &readDmaConfig);
     pio_sm_set_enabled(FIFO_PIO, dmaReadSm, true);
 #endif
+
+    PIO pioRwr = DMA_PIO;
+    const uint smRwr = dmaRomWrSm;
+    pio_sm_claim(pioRwr, smRwr);
+    uint irqRwr = PIO1_IRQ_0;
+    int romProgramOffsetWr = pio_add_program(pioRwr, &romWrite_program);
+    if (romProgramOffsetWr < 0)
+        panic("Failed add romWrite_program");
+    pio_sm_config romConfigWr = romWrite_program_get_default_config(romProgramOffsetWr);
+    sm_config_set_in_pins(&romConfigWr, PIN_A0);
+    sm_config_set_in_shift(&romConfigWr, SH_LEFT, false, 32);   // L shift
+    sm_config_set_out_shift(&romConfigWr, SH_RIGHT, false, 32); // R shift
+    sm_config_set_clkdiv(&romConfigWr, 1.0f);
+
+    pio_sm_init(pioRwr, smRwr, romProgramOffsetWr, &romConfigWr);
+    pio_set_irq0_source_enabled(pioRwr, pis_sm3_rx_fifo_not_empty, true);
+    irq_set_exclusive_handler(irqRwr, pio_irq_handler_rom_wr);
+    irq_set_enabled(irqRwr, true);
+    pio_sm_set_enabled(pioRwr, smRwr, true /* false */);
 }
 
 
@@ -368,7 +385,7 @@ void switchConfig()
     }
     else
     {
-        pio_remove_program_and_unclaim_sm( &rom_program, FIFO_PIO, dmaRomSm, romProgramOffset);
+        pio_remove_program_and_unclaim_sm( &rom_program, FIFO_PIO, dmaRomRdSm, romProgramOffset);
         loadFifoReadProgram();
     }
     LedUpdate();

@@ -31,7 +31,6 @@ extern recursive_mutex_t sd_mutex2;
 #define MTX_ENTER() recursive_mutex_enter_blocking(&sd_mutex2)
 #define MTX_TRY_ENTER() recursive_mutex_try_enter(&sd_mutex2, NULL)
 #define MTX_EXIT() recursive_mutex_exit(&sd_mutex2)
-extern volatile uint8_t v55_buf[4];
 
 extern bool bKbdEmu;
 extern bool lastLedVal;
@@ -41,6 +40,12 @@ extern bool lastLedVal;
 #define LedOff() Led(false)
 #define LedOn()  Led(true)
 
+#define dmaWriteSm 0
+#define dmaRomRdSm 2
+#define dmaReadSm  1
+#define fifoReadSm 0
+#define fifoWrite2Sm 1
+#define dmaRomWrSm 3
 
 #ifdef __cplusplus
 }

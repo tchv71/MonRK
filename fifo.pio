@@ -56,54 +56,45 @@ endPart:
 .wrap
 
 .program rom
-.define public PIN_nCS2 23
-.define public PIN_nWR 6
+.define public PIN_nRD 7
 .side_set 1 opt
   pull block
   mov x,osr
 .wrap_target
   mov osr, null       ; change CD0-7 pindirs to inputs
   out pindirs, 8 side 1
-  wait 0 gpio PIN_nCS2
-  jmp pin, romRead ; PIN_nWR
-  wait 1 gpio PIN_nWR
-  jmp s1
-rr01:
-  out null, 8
-  jmp loop0
-romRead:
+  wait 0 gpio PIN_nRD
+;romRead:
   mov isr, null
   mov OSR, !null
   out pindirs, 8 side 0   ; set up CD0-7 as outputs
   pull noblock
-  mov x,OSR
-
-  mov isr, null
+  mov x,osr
+rpt01:
   in pins, 2
+
   mov y, isr
+  jmp loop0
+rr01:
+  out null, 8
 loop0:
   jmp y--, rr01
   out pins, 8
-s1:
   in pins, 26;14+8+4
   push noblock
 
-  wait 1 gpio PIN_nCS2
-.wrap
-
-.program rom2
-;.define public PIN_nCS2 23
-.define public PIN_nRD 5
-.side_set 1 opt
-.wrap_target
-  mov osr, null       ; change CD0-7 pindirs to inputs
-  out pindirs, 8 side 1
-  wait 0 gpio PIN_nRD
-  mov OSR, !null
-  out pindirs, 8 side 0   ; set up CD0-7 as outputs
-  out pins, 8
   wait 1 gpio PIN_nRD
 .wrap
+
+.program romWrite
+.define public PIN_nWR 6
+.wrap_target
+  wait 0 gpio PIN_nWR
+  wait 1 gpio PIN_nWR
+  in pins, 26;14+8+4
+  push noblock
+.wrap
+
 
 .program dmaRead
 .define public nDACK_PIN 5

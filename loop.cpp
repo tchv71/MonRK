@@ -33,7 +33,6 @@ CircBuffer<1024> bufOut;
 
 static volatile bool bFlushOutBuffer = false;
 static volatile uint8_t outLength = 0xff;
-extern "C" const uint fifoWrite2Sm;
 
 /*
  * update the value send to the read PIO
@@ -69,8 +68,6 @@ void __not_in_flash_func(pio_irq_handler_write)()
     }
 }
 
-extern "C" const uint dmaRomSm;
-
 #if 0 //ndef KBD_EMU
 volatile uint16_t addr = 0;
 static uint16_t lastAddr = 0;
@@ -105,7 +102,7 @@ bool bPpiKbdMode = true;
 
 void __no_inline_not_in_flash_func (updateTX)()
 {
-    pio_sm_clear_fifos(FIFO_PIO, dmaRomSm);
+    pio_sm_clear_fifos(FIFO_PIO, dmaRomRdSm);
     if (!bPpiKbdMode)
     {
         int diffX = (mouseXAbs - mouseXAbsOld) / mouseDiv;
@@ -128,36 +125,24 @@ void __no_inline_not_in_flash_func (updateTX)()
         }
     }
 
-    pio_sm_put_blocking(FIFO_PIO, dmaRomSm, ((uint32_t)portCtrl << 24) |((uint32_t)portC << 16) | ((uint32_t)portB << 8) | (uint32_t)portA);
+    pio_sm_put_blocking(FIFO_PIO, dmaRomRdSm, ((uint32_t)portCtrl << 24) |((uint32_t)portC << 16) | ((uint32_t)portB << 8) | (uint32_t)portA);
 }
 
 
-void __not_in_flash_func(pio_irq_handler_rom)()
+void __not_in_flash_func(pio_irq_handler_rom_wr)()
 {
-    if (pio_sm_is_rx_fifo_empty(FIFO_PIO, dmaRomSm))
-        return;
-    uint32_t val = pio_sm_get_blocking(FIFO_PIO, dmaRomSm); // FIFO_PIO->rxf[dmaRomSm];
-
-    bool bWrite = (val & (1 << (PIN_nRD + 4))) != 0;
-
-    uint8_t w_addr = (val & 3);
-    if (!bWrite)
+    if (pio_sm_is_rx_fifo_empty(DMA_PIO, dmaRomWrSm))
     {
-        if (!bPpiKbdMode)
-        {
-            if (w_addr == 0)
-                mouseXAbsOld = mouseXAbs - mouseXAbs % mouseDiv;
-            else if (w_addr == 1)
-                mouseYAbsOld = mouseYAbs - mouseYAbs % mouseDiv;
-            else
-                return;
-            updateTX();
-            return;
-        }
-        if (w_addr==2)
-         updateTX();
+        for (int i=0;i<2;++i) ;
         return;
     }
+    uint32_t val = pio_sm_get_blocking(DMA_PIO, dmaRomWrSm);
+    DMA_PIO->irq = 1;
+    //pio_interrupt_clear(DMA_PIO, pis_sm3_rx_fifo_not_empty);
+    //irq_clear(PIO1_IRQ_0);
+
+    //bool bWrite = (val & (1 << (PIN_nRD + 4))) != 0;
+    uint8_t w_addr = (val & 3);
     uint8_t v_val = (val & (GPIO_CD_MASK << 4)) >> (PIN_CD7 + 4);
     switch (w_addr)
     {
@@ -216,68 +201,28 @@ void __not_in_flash_func(pio_irq_handler_rom)()
     default:
         break;
     }
-    v55_buf[w_addr] = v_val;
-#if 0 //ndef KBD_EMU
-    if (bStopRomEmu)
-        return;
-#if 1
-    if (addr == 0x44)
-    {
-        lastAddr = 0x44;
-    }
-    else if (addr == 0x40)
-    {
-        lastAddr = (lastAddr == 0x44) ? 0x40 : 0;
-    }
-    else if (addr == 0)
-    {
-        if (lastAddr == 0x40)
-            bStopRomEmu = true;
-        else
-            lastAddr = 0;
-    }
-#endif
-#endif
 }
-//     1   1   2   2   3   3   0   0
-//     0   0   0   0   0   0   1   1
-// B   _______|_______|_______|_______|_______|_______|
 
-// MODE_ 1 _ 0 _ 1 _ 0 _ 1 _ 0 _ 1 _ 0 _ 1 _ 0 _ 1 _ 0 _
-// RD   |_| |_| |_| |_| |_| |_| |_| |_| |_| |_| |_| |_|
-
-//         1       2       3       -       -
-// D   -------+-------+-------+-------+-------+-------+--
-
-//         0       0       0      1
-// RXE -------+-------+-------+-------+-------+-------+--
-//
-#if 0
-void __not_in_flash_func(pio_irq_handler_read)()
+void __not_in_flash_func(pio_irq_handler_rom_rd)()
 {
-    uint32_t readVal = pio_sm_get_blocking(FIFO_PIO, fifoReadSm);//FIFO_PIO->rxf[fifoReadSm];
-
-    if (!(readVal &  0x80000000)) // read data (MODE bit==0)
+    if (pio_sm_is_rx_fifo_empty(FIFO_PIO, dmaRomRdSm))
+        return;
+    uint32_t val = pio_sm_get_blocking(FIFO_PIO, dmaRomRdSm);
+    uint8_t w_addr = (val & 3);
+    if (!bPpiKbdMode)
     {
-        if (pStreamInBufPtr != pStreamInBufEnd)
-        {
-            if ((currentStatus & RXEMPTY) == 0)
-            {
-                nextValue = *pStreamInBufPtr++;
-            }
-        }
+        if (w_addr == 0)
+            mouseXAbsOld = mouseXAbs - mouseXAbs % mouseDiv;
+        else if (w_addr == 1)
+            mouseYAbsOld = mouseYAbs - mouseYAbs % mouseDiv;
         else
-        {
-            currentStatus = currentStatus | RXEMPTY;
-            // pStreamInBufPtr = pStreamInBufEnd = streamInBuf;
-            nextValue = 0;
-            updateFifoReadAhead();
             return;
-        }
+        updateTX();
+        return;
     }
-    updateFifoReadAhead();
+    if (w_addr == 2)
+        updateTX();
 }
-#endif
 
 /* Clock */
 #define PLL_SYS_KHZ (133 * 1000)
