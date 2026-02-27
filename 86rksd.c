@@ -92,10 +92,10 @@ void readInt(char rks)
   WORD readedLength, lengthFromFile;
   BYTE tmp;
   BYTE *wptr;
-  WORD SEC_LEN = 512;
+  const WORD SEC_LEN = 512;
 
-  if (readLength == 1024)
-    SEC_LEN = readLength;
+  // if (readLength == 1024)
+  //   SEC_LEN = readLength;
 
   while (readLength)
   {

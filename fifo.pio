@@ -37,8 +37,6 @@ start:
   wait 0 gpio CSR_PIN ; wait for CSR to go low (active)
   jmp pin readStatus  ; if PIN_A0_28 'mode' is high, read status bits 
 readData:
-  ;mov x, null
-  ;set x,0x15
   pull noblock
   out pins, 8         ; mode is low, send the data byte
   jmp endPart

@@ -138,10 +138,7 @@ void __not_in_flash_func(pio_irq_handler_rom_wr)()
     }
     uint32_t val = pio_sm_get_blocking(DMA_PIO, dmaRomWrSm);
     DMA_PIO->irq = 1;
-    //pio_interrupt_clear(DMA_PIO, pis_sm3_rx_fifo_not_empty);
-    //irq_clear(PIO1_IRQ_0);
 
-    //bool bWrite = (val & (1 << (PIN_nRD + 4))) != 0;
     uint8_t w_addr = (val & 3);
     uint8_t v_val = (val & (GPIO_CD_MASK << 4)) >> (PIN_CD7 + 4);
     switch (w_addr)

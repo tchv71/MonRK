@@ -148,27 +148,6 @@ void loadFifoReadProgram()
     // irq_set_enabled(PIO0_IRQ_0, true);
     pio_sm_set_enabled(FIFO_PIO, fifoReadSm, true);
     // updateFifoReadAhead();
-
-#if 0
-    pio_sm_claim(FIFO_PIO, dmaRomSm);
-    PIO pio = FIFO_PIO;
-    uint irq = PIO0_IRQ_0;
-    romProgramOffset = pio_add_program(pio, &rom2_program);
-    if (romProgramOffset < 0)
-        panic("Failed add fifoReadProgram");
-    pio_sm_config romConfig = rom2_program_get_default_config(romProgramOffset);
-    sm_config_set_in_pins(&romConfig, PIN_A0);
-    sm_config_set_sideset_pin_base(&romConfig, PIN_DIR);
-    sm_config_set_out_pins(&romConfig, PIN_CD7, 8);
-#define SH_LEFT false
-#define SH_RIGHT true
-    sm_config_set_in_shift(&romConfig, SH_LEFT, false, 32);   // L shift
-    sm_config_set_out_shift(&romConfig, SH_RIGHT, false, 32); // R shift
-    sm_config_set_clkdiv(&romConfig, 1.0f);
-
-    pio_sm_init(pio, dmaRomSm, romProgramOffset, &romConfig);
-    pio_sm_set_enabled(pio, dmaRomSm, true /* false */);
-#endif
 }
 
 
