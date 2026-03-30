@@ -81,7 +81,7 @@ BYTE __not_in_flash_func(recvByte)()
 #else
   BYTE c;
   dma_receive(&c, 1);
-   return c;
+  return c;
 #endif
 }
 
@@ -179,7 +179,7 @@ void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
   restore_interrupts(ints);
 #endif
   gpio_put(PIN_DRQ, 0);
-  while (gpio_get(PIN_nDACK) == 0) ;
+  while (gpio_get(PIN_nWR) == 0) ;
 #else
   DATA_IN();
   gpio_put(PIN_DRQ, 1);

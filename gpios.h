@@ -5,11 +5,13 @@
 #define PIN_CSR  26
 #define PIN_CSW  27
 #define PIN_A0_28   28
+#define PIN_A1   29
 
 #define GPIO_CD_MASK (0xff << PIN_CD7)
 #define GPIO_CSR_MASK (0x01 << PIN_CSR)
 #define GPIO_CSW_MASK (0x01 << PIN_CSW)
 #define GPIO_A0_MASK (0x01 << PIN_A0_28)
+#define GPIO_A1_MASK (0x01 << PIN_A1)
 
 #define _SPI spi1
 #define BAUD (1000*1000)
@@ -26,6 +28,7 @@
 #define PIN_nCS2 23
 #define PIN_nWR 6
 #define PIN_nRD 7
+#define PIN_USR_KEY 24
 
 enum
 {
@@ -48,6 +51,7 @@ enum
 #define nIOW_MASK  (1 << PIN_nIOW)
 #define nIOR_MASK  (1 << PIN_nIOR)
 #define DIR_MASK   (1 << PIN_DIR)
+#define USR_KEY_MASK (1 << PIN_USR_KEY)
 
 
 #define FIFO_PIO pio0

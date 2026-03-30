@@ -1,30 +1,40 @@
 // SD Controller for Computer "Radio 86RK" / "Apogee BK01"
 // (c) 10-05-2014 vinxru (aleksey.f.morozov@gmail.com)
 
-#ifndef COMMON_H
-#define COMMON_H
+#ifndef COMMON3_H
+#define COMMON3_H
+typedef unsigned int uint;
 
-#include <stdint-gcc.h>//<pico.h>
+#include <pico.h>
+#include <pico/platform.h>
+#include <machine/_default_types.h>
+#include <sys/_stdint.h>
 #include <pico/types.h>
 #include <sys/cdefs.h>
 #include <pico/platform/sections.h>
+#include <hardware/address_mapped.h>
+#include <hardware/sync.h>
+#include "pico/lock_core.h"
 #include <pico/sync.h>
+#include <pico/mutex.h>
+
+// #ifdef __cplusplus
+// extern "C" {
+// #endif
 
 #define CONST
 #define USE_DMA 1
 #define KBD_EMU 1
+//#define DMA_TEST 1
 #define USE_ETHERNET 1
 #define USE_SERIAL_DEBUG 1
 #ifdef KBD_EMU
 #undef USE_SERIAL_DEBUG
 #endif
-typedef uint8_t   BYTE;
-typedef uint16_t  WORD;
-typedef uint32_t  DWORD;
+typedef unsigned char BYTE;
+typedef unsigned short  WORD;
+typedef unsigned int  DWORD;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 extern recursive_mutex_t sd_mutex2;
 #define get_sd_mutex() &sd_mutex2
@@ -41,13 +51,13 @@ extern bool lastLedVal;
 #define LedOn()  Led(true)
 
 #define dmaWriteSm 0
-#define dmaRomRdSm 2
+#define fifoRomRdSm 2
 #define dmaReadSm  1
 #define fifoReadSm 0
 #define fifoWrite2Sm 1
 #define dmaRomWrSm 3
 
-#ifdef __cplusplus
-}
-#endif
+// #ifdef __cplusplus
+// }
+// #endif
 #endif

@@ -28,15 +28,16 @@
 
 .program fifoRead
 .define public CSR_PIN 26
-;.side_set 1 opt
+.side_set 1 opt
 .wrap_target
 start:
   mov osr, null       ; change CD0-7 pindirs to inputs
-  out pindirs, 8; side 1
+  out pindirs, 8 side 1
 
   wait 0 gpio CSR_PIN ; wait for CSR to go low (active)
   jmp pin readStatus  ; if PIN_A0_28 'mode' is high, read status bits 
 readData:
+
   pull noblock
   out pins, 8         ; mode is low, send the data byte
   jmp endPart
@@ -49,11 +50,11 @@ l02:
   out pins, 8       ; output the status byte (1 - is busy)
 endPart:
   mov osr, !null
-  out pindirs, 8; side 1   ; set up CD0-7 as outputs
+  out pindirs, 8 side 0   ; set up CD0-7 as outputs
   wait 1 gpio CSR_PIN ; wait for CSR to go high (inactive) 
 .wrap
 
-.program rom
+.program romRead
 .define public PIN_nRD 7
 .side_set 1 opt
   pull block
@@ -95,18 +96,18 @@ loop0:
 
 
 .program dmaRead
-.define public nDACK_PIN 5
+;;.define public nDACK_PIN 5
 .define public nIOR_PIN  3
 .side_set 1 opt
 .wrap_target
   mov osr, null       ; change CD0-7 pindirs to inputs
   out pindirs, 8 side 1
 
-  wait 1 gpio nDACK_PIN ; wait for nDACK_PIN to go inactive (high)
+  ;;wait 1 gpio nDACK_PIN ; wait for nDACK_PIN to go inactive (high)
   ;set pins, 1
-  wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
+  ;;wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
   wait 0 gpio nIOR_PIN  ; wait for nIOR to go active (low)
-  pull block
+  pull noblock
   out pins, 8           ; send the data byte
   out pindirs, 8 side 0 ; set up CD0-7 as outputs
   ;set pins, 0           ; reset wait trigger
@@ -135,12 +136,12 @@ loop0:
 .program dmaWrite
 .define public nDACK_PIN 5
 .define public nIOW_PIN  0
-  wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
+  ;;wait 0 gpio nDACK_PIN ; wait for nDACK to go active (low)
   wait 0 gpio nIOW_PIN  ; wait for nIOW to go active (low)
   ;set pins, 0           ; reset wait trigger
   wait 1 gpio nIOW_PIN  ; wait for nIOW high (inactive)
   in pins, 16           ; grab the data CD0-7 and auto-push
-  wait 1 gpio nDACK_PIN ; wait for nDACK_PIN to go inactive (high)
+  ;;wait 1 gpio nDACK_PIN ; wait for nDACK_PIN to go inactive (high)
   ;set pins, 1
 .wrap
 

@@ -37,7 +37,7 @@ static volatile uint8_t outLength = 0xff;
 /*
  * update the value send to the read PIO
  */
-static __force_inline bool updateFifoReadAhead()
+/* static __force_inline */ bool updateFifoReadAhead()
 {
     if (bufIn.isEmpty() || pio_sm_is_tx_fifo_full(FIFO_PIO, fifoReadSm))
         return false;
@@ -52,7 +52,7 @@ static __force_inline bool updateFifoReadAhead()
  */
 void __not_in_flash_func(pio_irq_handler_write)()
 {
-    uint32_t writeVal = DMA_PIO->rxf[fifoWrite2Sm];
+    uint32_t writeVal = pio_sm_get_blocking(DMA_PIO, fifoWrite2Sm);//DMA_PIO->rxf[fifoWrite2Sm];
 
     if ((writeVal & (GPIO_A0_MASK >> PIN_CD7)) == 0) // write val
     {
@@ -102,7 +102,7 @@ bool bPpiKbdMode = true;
 
 void __no_inline_not_in_flash_func (updateTX)()
 {
-    pio_sm_clear_fifos(FIFO_PIO, dmaRomRdSm);
+    pio_sm_clear_fifos(FIFO_PIO, fifoRomRdSm);
     if (!bPpiKbdMode)
     {
         int diffX = (mouseXAbs - mouseXAbsOld) / mouseDiv;
@@ -125,7 +125,7 @@ void __no_inline_not_in_flash_func (updateTX)()
         }
     }
 
-    pio_sm_put_blocking(FIFO_PIO, dmaRomRdSm, ((uint32_t)portCtrl << 24) |((uint32_t)portC << 16) | ((uint32_t)portB << 8) | (uint32_t)portA);
+    pio_sm_put_blocking(FIFO_PIO, fifoRomRdSm, ((uint32_t)portCtrl << 24) |((uint32_t)portC << 16) | ((uint32_t)portB << 8) | (uint32_t)portA);
 }
 
 
@@ -202,9 +202,9 @@ void __not_in_flash_func(pio_irq_handler_rom_wr)()
 
 void __not_in_flash_func(pio_irq_handler_rom_rd)()
 {
-    if (pio_sm_is_rx_fifo_empty(FIFO_PIO, dmaRomRdSm))
+    if (pio_sm_is_rx_fifo_empty(FIFO_PIO, fifoRomRdSm))
         return;
-    uint32_t val = pio_sm_get_blocking(FIFO_PIO, dmaRomRdSm);
+    uint32_t val = pio_sm_get_blocking(FIFO_PIO, fifoRomRdSm);
     uint8_t w_addr = (val & 3);
     if (!bPpiKbdMode)
     {
@@ -267,7 +267,7 @@ const uint16_t SOCKET_PORT = 1243;
 static uint8_t g_sntp_buf[ETHERNET_BUF_MAX_SIZE] = {
     0,
 };
-static uint8_t g_sntp_server_ip[4] = {216, 239, 35, 0}; // time.google.com
+static uint8_t g_sntp_server_ip[4] = {216, 239, 35, 8}; // time.google.com
 
 /* Timer */
 static volatile uint32_t g_msec_cnt = 0;
@@ -340,8 +340,8 @@ void networkInit()
     {
         // printf(" SNTP failed : %d\n", retval);
 
-        while (1)
-            ;
+        // while (1)
+        //     ;
     }
 
     // printf(" %d-%d-%d, %d:%d:%d\n", time.yy, time.mo, time.dd, time.hh, time.mm, time.ss);
@@ -503,7 +503,7 @@ void __not_in_flash_func(loop)()
         // MTX_EXIT();
     }
 #endif
-#if USE_SERIAL_DEBUG
+#ifdef USE_SERIAL_DEBUG
     if (!bSockEstablished && serial.available() /* && ((currentStatus & TXFULL) == 0) */ /* && pStreamInBufPtr == pStreamInBufEnd */)
     {
         bSerialEstablished = true;

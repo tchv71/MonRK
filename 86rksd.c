@@ -181,7 +181,7 @@ void cmd_ver()
 
   // Версия + Производитель
   {
-    flash char *ver = "V1.1 (DMA SIMPLE)";
+    flash char *ver = "V1.2 (DMA SMPL)";
     sendBinf(ver, 16);
   }
 }
@@ -196,7 +196,7 @@ void cmd_boot_exec()
 #if !USE_DMA
     const char *bootSdbiosRk = "boot/sdbios.rk";
 #else
-    const char *bootSdbiosRk = "boot/sdbiosds.rkl";
+    const char *bootSdbiosRk = "boot/sdbiosd.rkl";
 #endif
     if (buf[0] == 0)
       strcpy((char*) buf, /* (const char*) (nCS_GPIO_Port->IDR & nCS_Pin) ?  "boota/sdbios.rk" :  */bootSdbiosRk);
@@ -226,6 +226,7 @@ void cmd_boot_exec()
 void cmd_boot()
 {
   sendStart(STA_WAIT);
+  sendByte(STA_START);
   buf[0] = 0;
   cmd_boot_exec();
 }
@@ -985,6 +986,7 @@ enum {
   CMD_BIOS_WR_RECT,
 };
 
+WORD rom_size;
 
 BYTE RkSd_Loop()
 {
@@ -1079,6 +1081,24 @@ BYTE RkSd_Loop()
         cmd_set_time();
         break;
 #endif
+      case 99:
+#if 1 // def DMA_TEST
+        // sendStart(0x45);
+        // sendFlush();
+#if 0
+    for (int i=0; i<rom_size; ++i)
+      rom[i] = (i%2 == 0) ? 0 : 0xFE;
+#endif
+        while (1)
+        {
+          dma_send(rom, rom_size);
+          dma_receive(buf, rom_size);
+          dma_send(buf, rom_size);
+          // static int n = 0;
+          // n = memcmp(buf, rom, rom_size);
+        }
+        break;
+
       default:
         lastError = ERR_INVALID_COMMAND;
       }
@@ -1092,6 +1112,7 @@ BYTE RkSd_Loop()
         sendStart(lastError);
       } 
     }
+#endif
 
 #if 0// !USE_DMA
     // Порт работает на выход
@@ -1167,17 +1188,18 @@ int res = 0;
 void  __not_in_flash_func(main_sd)()
 {
   DATA_IN();
-  //busy_wait_ms(500);
-  multicore_fifo_push_blocking(0);
+  busy_wait_ms(500);
+  multicore_fifo_pop_blocking();
   LedOn();
   // Пауза, пока не стабилизируется питание
   //sleep_ms(300);
   // Запуск файловой системы
+  MTX_ENTER();
   if (fs_init())
     error();
    {
+    sleep_ms(100);
     //mutex_enter_blocking(&sd_mutex);
-    MTX_ENTER();
     strcpy(buf, "boot/boot.rk");
     if (fs_open())
       error();
@@ -1188,7 +1210,7 @@ void  __not_in_flash_func(main_sd)()
     if (fs_tmp > 256)
       error();
     {
-      WORD rom_size = (WORD)fs_tmp;
+      rom_size = (WORD)fs_tmp;
       if (fs_read0(rom, rom_size))
         error();
 
@@ -1196,22 +1218,6 @@ void  __not_in_flash_func(main_sd)()
 
       // Гасим светодиод
       LedOff();
-#if 0
-    //sendStart(0x45);
-    //sendFlush();
-#if 0
-    for (int i=0; i<rom_size; ++i)
-      rom[i] = (i%2 == 0) ? 0 : 0xFE;
-#endif
-    while (1)
-    {
-      dma_send(rom, rom_size);
-      dma_receive(buf, rom_size);
-      dma_send(buf, rom_size);
-      //static int n = 0;
-      //n = memcmp(buf, rom, rom_size);
-    }
-#endif
     }
     //mutex_exit(&sd_mutex);
     MTX_EXIT();

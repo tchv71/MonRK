@@ -14,7 +14,9 @@
 #include <hardware/vreg.h>
 #include <hardware/clocks.h>
 #include <hardware/spi.h>
+extern "C" {
 #include <common.h>
+}
 #include "fifo.pio.h"
 #include "pico/sync.h"
 #include "CircBuffer.h"
@@ -26,6 +28,10 @@
 #include "init.h"
 #include "hardware/structs/ioqspi.h"
 #include "hardware/structs/sio.h"
+
+extern "C" {
+#include "sd.h"
+}
 
 
 #define LEDBR 12
@@ -117,26 +123,41 @@ extern CircBuffer<10 * 1024> bufIn;
 extern CircBuffer<1024> bufOut;
 
 int fifoReadProgOffset = 0;
-int romProgramOffset = 0;
+int romReadProgramOffset = 0;
+bool updateFifoReadAhead();
+
+void setupFifoGpio()
+{
+    bufIn.clear();
+    bufOut.clear();
+
+    for (uint i = 0; i < 8; ++i)
+    {
+        pio_gpio_init(FIFO_PIO, PIN_CD7 + i);
+        gpio_set_drive_strength(PIN_CD7 + i, GPIO_DRIVE_STRENGTH_12MA);
+    }
+    pio_gpio_init(FIFO_PIO, PIN_DIR);
+}
 
 void loadFifoReadProgram()
 {
+    setupFifoGpio();
     pio_sm_claim(FIFO_PIO, fifoReadSm);
+    pio_sm_clear_fifos(FIFO_PIO, fifoReadSm);
     fifoReadProgOffset = pio_add_program(FIFO_PIO, &fifoRead_program);
     if (fifoReadProgOffset < 0)
         panic("Failed add fifoReadProgram");
 
-    pio_sm_set_pins_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
-    pio_sm_set_pindirs_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
-    // pio_sm_set_consecutive_pindirs(FIFO_PIO, fifoReadSm, DIR, 1, true);
-    //hw_set_bits(&FIFO_PIO->input_sync_bypass, (uint32_t)-1/* (1u << PIN_A0_28) | (1u << PIN_CSR) */);
+    //pio_sm_set_pins_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
+    //pio_sm_set_pindirs_with_mask(FIFO_PIO, fifoReadSm, DIR_MASK, DIR_MASK);
+     //hw_set_bits(&FIFO_PIO->input_sync_bypass, (uint32_t)-1/* (1u << PIN_A0_28) | (1u << PIN_CSR) */);
     /* fifoReadProg */
     pio_sm_config readFifoConfig = fifoRead_program_get_default_config(fifoReadProgOffset);
-    sm_config_set_in_pins(&readFifoConfig, PIN_CSR);
+    //sm_config_set_in_pins(&readFifoConfig, PIN_CSR);
     sm_config_set_jmp_pin(&readFifoConfig, PIN_A0_28);
     sm_config_set_mov_status(&readFifoConfig, STATUS_TX_LESSTHAN, 1);
     sm_config_set_fifo_join(&readFifoConfig, PIO_FIFO_JOIN_TX);
-    //sm_config_set_sideset_pin_base(&readFifoConfig, PIN_DIR);
+    sm_config_set_sideset_pin_base(&readFifoConfig, PIN_DIR);
     sm_config_set_out_pins(&readFifoConfig, PIN_CD7, 8);
     sm_config_set_in_shift(&readFifoConfig, true, false, 32);  // R shift
     sm_config_set_out_shift(&readFifoConfig, true, false, 32); // R shift
@@ -145,9 +166,11 @@ void loadFifoReadProgram()
     pio_sm_init(FIFO_PIO, fifoReadSm, fifoReadProgOffset, &readFifoConfig);
     // pio_set_irq0_source_enabled(FIFO_PIO, pis_sm0_rx_fifo_not_empty, true);
     // irq_set_exclusive_handler(PIO0_IRQ_0, pio_irq_handler_read);
-    // irq_set_enabled(PIO0_IRQ_0, true);
+    //irq_set_enabled(PIO0_IRQ_0, false);
+    pio_sm_set_consecutive_pindirs(FIFO_PIO, fifoReadSm, PIN_CD7, 8, false);
+    //pio_set_irq0_source_enabled(FIFO_PIO, pis_sm2_rx_fifo_not_empty, false);
     pio_sm_set_enabled(FIFO_PIO, fifoReadSm, true);
-    // updateFifoReadAhead();
+   //updateFifoReadAhead();
 }
 
 
@@ -176,20 +199,13 @@ void loadFifoWriteProgram()
  */
 void fifoPioInit()
 {
-    bufIn.clear();
-    bufOut.clear();
-
-    for (uint i = 0; i < 8; ++i)
-    {
-        pio_gpio_init(FIFO_PIO, PIN_CD7 + i);
-        gpio_set_drive_strength(PIN_CD7 + i, GPIO_DRIVE_STRENGTH_12MA);
-    }
-    pio_gpio_init(FIFO_PIO, PIN_DIR);
-#if USE_SERIAL_DEBUG
+    setupFifoGpio();
+#ifdef USE_SERIAL_DEBUG
     loadFifoReadProgram();
 #endif
     loadFifoWriteProgram();
 }
+
 /*
  * Set up PIOs for pico <-> CPU interface
  * FIFO pio for read-like programs
@@ -198,15 +214,15 @@ void fifoPioInit()
 extern void __not_in_flash_func(updateTX)();
 void loadKbdProgram()
 {
-    pio_sm_claim(FIFO_PIO, dmaRomRdSm);
+    pio_sm_claim(FIFO_PIO, fifoRomRdSm);
     PIO pio = FIFO_PIO;
     uint irq = PIO0_IRQ_0;
-    romProgramOffset = pio_add_program(pio, &rom_program);
-    if (romProgramOffset < 0)
+    romReadProgramOffset = pio_add_program(pio, &romRead_program);
+    if (romReadProgramOffset < 0)
         panic("Failed add fifoReadProgram");
-    pio_sm_clear_fifos(pio, dmaRomRdSm);
+    pio_sm_clear_fifos(pio, fifoRomRdSm);
 
-    pio_sm_config romConfig = rom_program_get_default_config(romProgramOffset);
+    pio_sm_config romConfig = romRead_program_get_default_config(romReadProgramOffset);
     sm_config_set_in_pins(&romConfig, PIN_A0);
     sm_config_set_jmp_pin(&romConfig, PIN_nWR);
     sm_config_set_sideset_pin_base(&romConfig, PIN_DIR);
@@ -217,12 +233,12 @@ void loadKbdProgram()
     sm_config_set_out_shift(&romConfig, SH_RIGHT, false, 32); // R shift
     sm_config_set_clkdiv(&romConfig, 1.0f);
 
-    pio_sm_init(pio, dmaRomRdSm, romProgramOffset, &romConfig);
+    pio_sm_init(pio, fifoRomRdSm, romReadProgramOffset, &romConfig);
     pio_set_irq0_source_enabled(pio, pis_sm2_rx_fifo_not_empty, true);
     irq_set_exclusive_handler(irq, pio_irq_handler_rom_rd);
     irq_set_enabled(irq, true);
-    pio_sm_set_enabled(pio, dmaRomRdSm, true /* false */);
-    enable_interrupts();
+    pio_sm_set_enabled(pio, fifoRomRdSm, true /* false */);
+    //enable_interrupts();
     updateTX();
 }
 
@@ -239,10 +255,10 @@ void dmaPioInit()
         panic("Failed add dmaWriteProgram");
    
     pio_sm_config writeConfig = dmaWrite_program_get_default_config(dmaWriteProgOffset);
-    sm_config_set_jmp_pin(&writeConfig, PIN_nDACK);
+    //sm_config_set_jmp_pin(&writeConfig, PIN_nDACK);
     sm_config_set_fifo_join(&writeConfig, PIO_FIFO_JOIN_RX);
     sm_config_set_in_pins(&writeConfig, PIN_CD7);
-    sm_config_set_in_shift(&writeConfig, false, true, 16); // L shift, autopush @ 16 bits
+    sm_config_set_in_shift(&writeConfig, SH_LEFT, true/*Autopush*/, 16); // L shift, autopush @ 16 bits
     sm_config_set_clkdiv(&writeConfig, 1.0f);
 
     pio_sm_init(DMA_PIO, dmaWriteSm, dmaWriteProgOffset, &writeConfig);
@@ -277,16 +293,16 @@ void dmaPioInit()
     const uint smRwr = dmaRomWrSm;
     pio_sm_claim(pioRwr, smRwr);
     uint irqRwr = PIO1_IRQ_0;
-    int romProgramOffsetWr = pio_add_program(pioRwr, &romWrite_program);
-    if (romProgramOffsetWr < 0)
+    int romWriteProgramOffset = pio_add_program(pioRwr, &romWrite_program);
+    if (romWriteProgramOffset < 0)
         panic("Failed add romWrite_program");
-    pio_sm_config romConfigWr = romWrite_program_get_default_config(romProgramOffsetWr);
+    pio_sm_config romConfigWr = romWrite_program_get_default_config(romWriteProgramOffset);
     sm_config_set_in_pins(&romConfigWr, PIN_A0);
     sm_config_set_in_shift(&romConfigWr, SH_LEFT, false, 32);   // L shift
     sm_config_set_out_shift(&romConfigWr, SH_RIGHT, false, 32); // R shift
     sm_config_set_clkdiv(&romConfigWr, 1.0f);
 
-    pio_sm_init(pioRwr, smRwr, romProgramOffsetWr, &romConfigWr);
+    pio_sm_init(pioRwr, smRwr, romWriteProgramOffset, &romConfigWr);
     pio_set_irq0_source_enabled(pioRwr, pis_sm3_rx_fifo_not_empty, true);
     irq_set_exclusive_handler(irqRwr, pio_irq_handler_rom_wr);
     irq_set_enabled(irqRwr, true);
@@ -303,7 +319,7 @@ void dmaPioInit()
 // This doesn't work if others are trying to access flash at the same time,
 // e.g. XIP streamer, or the other core.
 
-bool __no_inline_not_in_flash_func(get_bootsel_button)() {
+bool __no_inline_not_in_flash_func(get_usr_button)() {
 #if 0
     const uint CS_PIN_INDEX = 1;
 
@@ -336,11 +352,15 @@ bool __no_inline_not_in_flash_func(get_bootsel_button)() {
 
     restore_interrupts(flags);
 #else
+#if 0
     gpio_set_dir(PIN_LED, GPIO_IN);
     //sleep_ms(10);
     for (volatile int i = 0; i < 1000; ++i);
     bool button_state = gpio_get(PIN_LED);
     gpio_set_dir(PIN_LED, GPIO_OUT);
+#else
+    bool button_state = !gpio_get(PIN_USR_KEY);
+#endif
 #endif
     return button_state;
 }
@@ -358,16 +378,43 @@ void switchConfig()
     if (bKbdEmu)
     {
         //pio_remove_program_and_unclaim_sm( &rom2_program, FIFO_PIO, dmaRomSm, romProgramOffset);
+        pio_sm_set_enabled(FIFO_PIO, fifoReadSm, false);
         pio_remove_program_and_unclaim_sm( &fifoRead_program, FIFO_PIO, fifoReadSm, fifoReadProgOffset);
         loadKbdProgram();
 
     }
     else
     {
-        pio_remove_program_and_unclaim_sm( &rom_program, FIFO_PIO, dmaRomRdSm, romProgramOffset);
+        pio_sm_set_enabled(FIFO_PIO, fifoRomRdSm, false);
+        pio_remove_program_and_unclaim_sm( &romRead_program, FIFO_PIO, fifoRomRdSm, romReadProgramOffset);
         loadFifoReadProgram();
     }
     LedUpdate();
+}
+
+extern void networkInit();
+
+void setup()
+{
+    gpio_init_mask(GPIO_CD_MASK | GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK | GPIO_A1_MASK);
+    gpio_set_dir_in_masked(GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK | GPIO_A1_MASK);
+    gpio_init(PIN_DIR);
+    gpio_put(PIN_DIR, 1);
+    gpio_set_dir(PIN_DIR, GPIO_OUT);
+    gpio_set_drive_strength(PIN_DIR, GPIO_DRIVE_STRENGTH_12MA);
+    gpio_pull_up(PIN_CD7);
+
+    gpio_init(PIN_USR_KEY);
+    gpio_set_dir(PIN_USR_KEY, false);
+    gpio_set_pulls(PIN_USR_KEY, true, false);
+
+    dmaPioInit();
+    fifoPioInit();
+    multicore_fifo_pop_blocking();
+#if USE_ETHERNET
+    networkInit();
+#endif
+    multicore_fifo_push_blocking(0);
 }
 
 void setup1()
@@ -378,6 +425,8 @@ void setup1()
     // gpio_set_function(PIN_SPI_CSn, GPIO_FUNC_SPI);
     gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI);
     gpio_set_function(PIN_SPI_TX, GPIO_FUNC_SPI);
+    sd_init();
+    multicore_fifo_push_blocking(1);
 
     gpio_init_mask(A0_MASK | A1_MASK | nCS2_MASK | /* GPIO_CD_MASK |  */ nWR_MASK | nRD_MASK | nIOR_MASK | nIOR_MASK);
 
@@ -427,25 +476,9 @@ void main1()
 /* file globals */
 
 extern void fifoPioInit();
+void setupFifoGpio();
 extern void networkInit();
 
-void setup()
-{
-    gpio_init_mask(GPIO_CD_MASK | GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
-    gpio_set_dir_in_masked(GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK);
-    gpio_init(PIN_DIR);
-    gpio_put(PIN_DIR, 1);
-    gpio_set_dir(PIN_DIR, GPIO_OUT);
-    gpio_set_drive_strength(PIN_DIR, GPIO_DRIVE_STRENGTH_12MA);
-    gpio_pull_up(PIN_CD7);
-
-    dmaPioInit();
-    fifoPioInit();
-#if USE_ETHERNET
-    networkInit();
-#endif
-    multicore_fifo_push_blocking(0);
-}
 
 #define PICO_CLOCK_PLL 1260000000
 #define PICO_CLOCK_PLL_DIV1 5
@@ -666,8 +699,8 @@ uint32_t lastTimestamp = to_ms_since_boot(get_absolute_time());
 int main()
 {
     vreg_set_voltage(VREG_VOLTAGE_1_30);
-    //set_sys_clock_pll(PICO_CLOCK_PLL, PICO_CLOCK_PLL_DIV1, PICO_CLOCK_PLL_DIV2); // 252000
-    set_sys_clock_khz(320000, false);
+    set_sys_clock_pll(PICO_CLOCK_PLL, PICO_CLOCK_PLL_DIV1, PICO_CLOCK_PLL_DIV2); // 252000
+    //set_sys_clock_khz(320000, false);
     recursive_mutex_init(get_sd_mutex());
     stdio_init_all();
     // stdio_set_translate_crlf(&stdio_usb, false);
@@ -689,7 +722,7 @@ int main()
         if ((timestamp - lastTimestamp) > 50)
         {
             bool bButton = false;
-            bButton = get_bootsel_button();
+            bButton = get_usr_button();
             static bool bLastButton = false;
             if (bButton && !bLastButton)
             {

@@ -203,9 +203,12 @@ abort:
 /**************************************************************************
  *  Инициализация карты                                                    *
  **************************************************************************/
+static bool bSdInitialized = false;
 
 BYTE sd_init()
 {
+  if (bSdInitialized)
+    return 0;
   MTX_ENTER();
   BYTE tries;
 
@@ -221,6 +224,7 @@ BYTE sd_init()
     if (--tries == 0)
     {
       lastError = ERR_DISK_ERR;
+      MTX_EXIT();
       return 1;
     }
 
@@ -228,6 +232,7 @@ BYTE sd_init()
   // SPI_HIGHSPEED
   spi_set_baudrate(_SPI, 10 * 1000 * 1000);
   MTX_EXIT();
+  bSdInitialized = true;
   return 0;
 }
 
