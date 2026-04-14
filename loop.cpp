@@ -68,23 +68,51 @@ void __not_in_flash_func(pio_irq_handler_write)()
     }
 }
 
-#if 0 //ndef KBD_EMU
-volatile uint16_t addr = 0;
-static uint16_t lastAddr = 0;
-static uint16_t lastAddr2 = 0;
-volatile bool bStopRomEmu = false;
-volatile bool bEvent = false;
-#endif
-//volatile uint8_t rowMask = 0xff;
-
 const uint8_t PPI_MOUSE_MODE = 0x80;
 const uint8_t PPI_KBD_MODE = 0x8A;
 
+#ifdef MSX
+volatile uint8_t kbdMatr[16] = {255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255};
+#else
 volatile uint8_t kbdMatr[9] = {255,255,255,255,255,255,255,255,255};
+#endif
 volatile uint8_t portA = 0;
 volatile uint8_t portB = 0xFF;
 volatile uint8_t portC = 0xE0; 
 volatile uint8_t portCtrl = 0x8A; 
+
+volatile uint8_t priSlots = 0;
+volatile uint8_t extSlots = 0;
+// SlotID in F000EEPP format for pages 0-3
+volatile uint8_t extSlotsTbl[4] = {0};
+
+
+void __not_in_flash_func(pio_irq_handler_ffff_write)()
+{
+    uint32_t writeVal = pio_sm_get_blocking(DMA_PIO, ffffWriteSm); // DMA_PIO->rxf[fifoWrite2Sm];
+
+    extSlots = writeVal & 0xff;
+    uint8_t sltSel = (extSlots & 0xC0) >> 6;
+    pio_sm_put(FIFO_PIO, ffffReadSm, 0xFF << 8 | ~extSlots);
+
+    uint8_t priS = priSlots;
+    uint8_t extS = extSlots;
+    for (uint8_t i = 0; i < 4; ++i)
+    {
+        uint8_t otbl = extSlotsTbl[i];
+        if ((otbl & 3) == sltSel)
+        {
+            extSlotsTbl[i] = ((extS & 3) << 2) | (priS & 3) | 0x80;
+            if (otbl != extSlotsTbl[i])
+            {
+                // Slot changed
+            }
+        }
+        priS >>= 2;
+        extS >>= 2;
+    }
+}
+
 
 uint8_t portASave = portA;
 uint8_t portBSave = portB;
@@ -115,6 +143,10 @@ void __no_inline_not_in_flash_func (updateTX)()
     }
     else
     {
+#ifdef MSX
+        uint8_t row = portC & 0xF;
+        portB = kbdMatr[row];
+#else
         portB = 0xff;
         uint8_t mask = 1;
         for (uint8_t i = 0; i < 8; ++i)
@@ -123,6 +155,7 @@ void __no_inline_not_in_flash_func (updateTX)()
                 portB &= kbdMatr[i];
             mask = mask << 1;
         }
+#endif
     }
 
     pio_sm_put_blocking(FIFO_PIO, fifoRomRdSm, ((uint32_t)portCtrl << 24) |((uint32_t)portC << 16) | ((uint32_t)portB << 8) | (uint32_t)portA);
@@ -145,10 +178,14 @@ void __not_in_flash_func(pio_irq_handler_rom_wr)()
     {
 #if 1//def KBD_EMU
     case 0:
-        portA = v_val;
+        priSlots = portA = v_val;
         updateTX();
         break;
+    case 1:
+        portB = v_val;
+        break;
     case 2:
+        portC = v_val;
         break;
     case 3:
         portCtrl = v_val;

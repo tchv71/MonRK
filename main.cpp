@@ -117,6 +117,7 @@ extern "C" void main_sd();
 
 
 extern void __not_in_flash_func(pio_irq_handler_write)();
+extern void __not_in_flash_func(pio_irq_handler_ffff_write)();
 extern void __not_in_flash_func(pio_irq_handler_rom_wr)();
 extern void __not_in_flash_func(pio_irq_handler_rom_rd)();
 extern CircBuffer<10 * 1024> bufIn;
@@ -256,6 +257,7 @@ void dmaPioInit()
    
     pio_sm_config writeConfig = dmaWrite_program_get_default_config(dmaWriteProgOffset);
     //sm_config_set_jmp_pin(&writeConfig, PIN_nDACK);
+    sm_config_set_in_pin_base(&writeConfig, PIN_nIOW);
     sm_config_set_fifo_join(&writeConfig, PIO_FIFO_JOIN_RX);
     sm_config_set_in_pins(&writeConfig, PIN_CD7);
     sm_config_set_in_shift(&writeConfig, SH_LEFT, true/*Autopush*/, 16); // L shift, autopush @ 16 bits
@@ -264,29 +266,67 @@ void dmaPioInit()
     pio_sm_init(DMA_PIO, dmaWriteSm, dmaWriteProgOffset, &writeConfig);
     pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true/* false */);
     //
+    pio_sm_config writeFFFFConfig = dmaWrite_program_get_default_config(dmaWriteProgOffset);
+    sm_config_set_in_pin_base(&writeFFFFConfig, PIN_nFFFF_W);
+    sm_config_set_fifo_join  (&writeFFFFConfig, PIO_FIFO_JOIN_RX);
+    sm_config_set_in_pins    (&writeFFFFConfig, PIN_CD7);
+    sm_config_set_in_shift   (&writeFFFFConfig, SH_LEFT, true/*Autopush*/, 16); // L shift, autopush @ 16 bits
+    sm_config_set_clkdiv     (&writeFFFFConfig, 1.0f);
+
+    pio_sm_init(DMA_PIO, ffffWriteSm, dmaWriteProgOffset, &writeFFFFConfig);
+    pio_sm_set_enabled(DMA_PIO, ffffWriteSm, true/* false */);
+    pio_set_irq0_source_enabled(DMA_PIO, pis_sm1_rx_fifo_not_empty, true);
+    const uint irq0 = PIO1_IRQ_0;
+    irq_set_exclusive_handler(irq0, pio_irq_handler_ffff_write);
+    irq_set_enabled(irq0, true);
+
+    //
     int dmaReadProgOffset = pio_add_program(FIFO_PIO, &dmaRead_program);
     if (dmaReadProgOffset<0)
         panic("Failed add dmaReadProgram");
 
     pio_gpio_init(FIFO_PIO, PIN_DIR);
-    pio_gpio_init(FIFO_PIO, PIN_nWAIT);
-    uint32_t mask = DIR_MASK | nWAIT_MASK;
+    //pio_gpio_init(FIFO_PIO, PIN_nWAIT);
+    const uint32_t mask = DIR_MASK;
     pio_sm_set_pins_with_mask(FIFO_PIO, dmaReadSm, mask, mask);
     pio_sm_set_pindirs_with_mask(FIFO_PIO, dmaReadSm, mask, mask);
 
     pio_sm_config readDmaConfig = dmaRead_program_get_default_config(dmaReadProgOffset);
     //sm_config_set_in_pins(&readDmaConfig, PIN_CSR);
     sm_config_set_jmp_pin(&readDmaConfig, PIN_nDACK);
+    sm_config_set_in_pin_base(&readDmaConfig, PIN_nIOR);
     sm_config_set_fifo_join(&readDmaConfig, PIO_FIFO_JOIN_TX);
     sm_config_set_sideset_pin_base(&readDmaConfig, PIN_DIR);
     sm_config_set_out_pins(&readDmaConfig, PIN_CD7, 8);
-    sm_config_set_set_pins(&readDmaConfig, PIN_nWAIT, 1);
+    //sm_config_set_set_pins(&readDmaConfig, PIN_nWAIT, 1);
     sm_config_set_in_shift(&readDmaConfig, true, false, 32); // R shift
     sm_config_set_out_shift(&readDmaConfig, true, false, 32); // R shift
     sm_config_set_clkdiv(&readDmaConfig, 1.0f);
 
     pio_sm_init(FIFO_PIO, dmaReadSm, dmaReadProgOffset, &readDmaConfig);
     pio_sm_set_enabled(FIFO_PIO, dmaReadSm, true);
+
+    // int dmaReadProgOffset = pio_add_program(FIFO_PIO, &dmaRead_program);
+    // if (dmaReadProgOffset<0)
+    //     panic("Failed add dmaReadProgram");
+
+    pio_gpio_init(FIFO_PIO, PIN_DIR);
+    //pio_gpio_init(FIFO_PIO, PIN_nWAIT);
+    pio_sm_set_pins_with_mask(FIFO_PIO, ffffReadSm, mask, mask);
+    pio_sm_set_pindirs_with_mask(FIFO_PIO, ffffReadSm, mask, mask);
+
+    pio_sm_config readFFFFConfig = dmaRead_program_get_default_config(dmaReadProgOffset);
+    sm_config_set_in_pin_base(&readFFFFConfig, PIN_nFFFF_R);
+    sm_config_set_fifo_join(&readFFFFConfig, PIO_FIFO_JOIN_TX);
+    sm_config_set_sideset_pin_base(&readFFFFConfig, PIN_DIR);
+    sm_config_set_out_pins(&readFFFFConfig, PIN_CD7, 8);
+     sm_config_set_in_shift(&readFFFFConfig, true, false, 32); // R shift
+    sm_config_set_out_shift(&readFFFFConfig, true, false, 32); // R shift
+    sm_config_set_clkdiv(&readFFFFConfig, 1.0f);
+
+    pio_sm_init(FIFO_PIO, ffffReadSm, dmaReadProgOffset, &readFFFFConfig);
+    pio_sm_set_enabled(FIFO_PIO, ffffReadSm, true);
+
 #endif
 
     PIO pioRwr = DMA_PIO;
@@ -441,8 +481,8 @@ void setup1()
     // gpio_init(PIN_nWAIT);
     // gpio_put(PIN_nWAIT, 1);
     // gpio_set_dir(PIN_nWAIT, GPIO_OUT);
-    gpio_set_drive_strength(PIN_nWAIT, GPIO_DRIVE_STRENGTH_12MA);
-    gpio_pull_down(PIN_nWAIT);
+    //gpio_set_drive_strength(PIN_nWAIT, GPIO_DRIVE_STRENGTH_12MA);
+    //gpio_pull_down(PIN_nWAIT);
 
     gpio_init(PIN_nDACK);
     gpio_set_dir(PIN_nDACK, GPIO_IN);

@@ -2,11 +2,11 @@
 #include "bsp/board.h"
 #include "tusb.h"
 #include "scancode_rk.h"
+#include "common.h"
 
 uint8_t tab_key[128] = {0x00};     // таблица нажатых клавиш
 uint8_t tab_key_old[128] = {0x00}; // таблица предыдушего нажатия клавиш
 
-//define MSX
 //----------------------------------------------------------
 // table usb
 //--------------------------------------------------------
@@ -765,6 +765,9 @@ void __noinline rk_key(uint8_t code, bool bOn) // клавиша нажата/о
 		}
 	}
 	portC = 0xE0 & ~((bCtrl ? Kl_Ctrl : 0) | (bShift ? Kl_Shift : 0) | (bRusLat ? Kl_RusLat : 0));
+#ifdef MSX
+	portC |= row;
+#endif
 	if (bOn)
 	{
 		if (code < KBD_MOD_ALT)

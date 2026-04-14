@@ -15,11 +15,13 @@
 
 #define _SPI spi1
 #define BAUD (1000*1000)
-#define PIN_nWAIT 2
+//#define PIN_nWAIT 2
 #define PIN_DRQ   4
 #define PIN_nDACK 5
 #define PIN_nIOW  0
 #define PIN_nIOR  3
+#define PIN_nFFFF_R 23
+#define PIN_nFFFF_W 2
 #define PIN_DIR   8
 #define PIN_LED   25
 

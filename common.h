@@ -31,6 +31,8 @@ typedef unsigned int uint;
 #ifdef KBD_EMU
 #undef USE_SERIAL_DEBUG
 #endif
+#define MSX
+
 typedef unsigned char BYTE;
 typedef unsigned short  WORD;
 typedef unsigned int  DWORD;
@@ -55,6 +57,8 @@ extern bool lastLedVal;
 #define dmaReadSm  1
 #define fifoReadSm 0
 #define fifoWrite2Sm 1
+#define ffffReadSm 3
+#define ffffWriteSm 2
 #define dmaRomWrSm 3
 
 // #ifdef __cplusplus
