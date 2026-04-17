@@ -190,10 +190,11 @@ void loadFifoWriteProgram()
     //
     pio_sm_init(DMA_PIO, fifoWrite2Sm, fifoWriteProgOffset, &writeConfig2);
     pio_sm_set_enabled(DMA_PIO, fifoWrite2Sm, true);
-    pio_set_irq1_source_enabled(DMA_PIO, pis_sm1_rx_fifo_not_empty, true);
-    const uint irq = PIO1_IRQ_1;
-    irq_set_exclusive_handler(irq, pio_irq_handler_write);
-    irq_set_enabled(irq, true);
+    pio_set_irq0_source_enabled(DMA_PIO, pis_sm1_rx_fifo_not_empty, true);
+    //pio_set_irq0_source_mask_enabled(DMA_PIO, (1 <<pis_sm3_rx_fifo_not_empty) | (1 <<pis_sm1_rx_fifo_not_empty), true);
+    //irq_add_shared_handler(PIO1_IRQ_0, pio_irq_handler_write,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY );
+    irq_set_exclusive_handler(PIO1_IRQ_0, pio_irq_handler_write);
+    irq_set_enabled(PIO1_IRQ_0, true);
 }
 /*
  * Set up PIOs for pico <-> CPU interface
@@ -203,8 +204,8 @@ void fifoPioInit()
     setupFifoGpio();
 #ifdef USE_SERIAL_DEBUG
     loadFifoReadProgram();
-#endif
     loadFifoWriteProgram();
+#endif
 }
 
 /*
@@ -216,12 +217,10 @@ extern void __not_in_flash_func(updateTX)();
 void loadKbdProgram()
 {
     pio_sm_claim(FIFO_PIO, fifoRomRdSm);
-    PIO pio = FIFO_PIO;
-    uint irq = PIO0_IRQ_0;
-    romReadProgramOffset = pio_add_program(pio, &romRead_program);
+    romReadProgramOffset = pio_add_program(FIFO_PIO, &romRead_program);
     if (romReadProgramOffset < 0)
         panic("Failed add fifoReadProgram");
-    pio_sm_clear_fifos(pio, fifoRomRdSm);
+    pio_sm_clear_fifos(FIFO_PIO, fifoRomRdSm);
 
     pio_sm_config romConfig = romRead_program_get_default_config(romReadProgramOffset);
     sm_config_set_in_pins(&romConfig, PIN_A0);
@@ -234,11 +233,11 @@ void loadKbdProgram()
     sm_config_set_out_shift(&romConfig, SH_RIGHT, false, 32); // R shift
     sm_config_set_clkdiv(&romConfig, 1.0f);
 
-    pio_sm_init(pio, fifoRomRdSm, romReadProgramOffset, &romConfig);
-    pio_set_irq0_source_enabled(pio, pis_sm2_rx_fifo_not_empty, true);
-    irq_set_exclusive_handler(irq, pio_irq_handler_rom_rd);
-    irq_set_enabled(irq, true);
-    pio_sm_set_enabled(pio, fifoRomRdSm, true /* false */);
+    pio_sm_init(FIFO_PIO, fifoRomRdSm, romReadProgramOffset, &romConfig);
+    pio_set_irq0_source_enabled(FIFO_PIO, pis_sm2_rx_fifo_not_empty, true);
+    irq_set_exclusive_handler(PIO0_IRQ_0, pio_irq_handler_rom_rd);
+    irq_set_enabled(PIO0_IRQ_0, true);
+    pio_sm_set_enabled(FIFO_PIO, fifoRomRdSm, true /* false */);
     //enable_interrupts();
     updateTX();
 }
@@ -259,27 +258,31 @@ void dmaPioInit()
     //sm_config_set_jmp_pin(&writeConfig, PIN_nDACK);
     sm_config_set_in_pin_base(&writeConfig, PIN_nIOW);
     sm_config_set_fifo_join(&writeConfig, PIO_FIFO_JOIN_RX);
-    sm_config_set_in_pins(&writeConfig, PIN_CD7);
-    sm_config_set_in_shift(&writeConfig, SH_LEFT, true/*Autopush*/, 16); // L shift, autopush @ 16 bits
+    //sm_config_set_in_pins(&writeConfig, PIN_CD7);
+    sm_config_set_in_shift(&writeConfig, SH_LEFT, true/*Autopush*/, 24); // L shift, autopush @ 16 bits
     sm_config_set_clkdiv(&writeConfig, 1.0f);
 
     pio_sm_init(DMA_PIO, dmaWriteSm, dmaWriteProgOffset, &writeConfig);
     pio_sm_set_enabled(DMA_PIO, dmaWriteSm, true/* false */);
     //
+#if 1
     pio_sm_config writeFFFFConfig = dmaWrite_program_get_default_config(dmaWriteProgOffset);
     sm_config_set_in_pin_base(&writeFFFFConfig, PIN_nFFFF_W);
     sm_config_set_fifo_join  (&writeFFFFConfig, PIO_FIFO_JOIN_RX);
-    sm_config_set_in_pins    (&writeFFFFConfig, PIN_CD7);
-    sm_config_set_in_shift   (&writeFFFFConfig, SH_LEFT, true/*Autopush*/, 16); // L shift, autopush @ 16 bits
+    //sm_config_set_in_pins    (&writeFFFFConfig, PIN_CD7);
+    sm_config_set_in_shift   (&writeFFFFConfig, SH_LEFT, true/*Autopush*/, 24); // L shift, autopush @ 16 bits
     sm_config_set_clkdiv     (&writeFFFFConfig, 1.0f);
 
     pio_sm_init(DMA_PIO, ffffWriteSm, dmaWriteProgOffset, &writeFFFFConfig);
     pio_sm_set_enabled(DMA_PIO, ffffWriteSm, true/* false */);
-    pio_set_irq0_source_enabled(DMA_PIO, pis_sm1_rx_fifo_not_empty, true);
-    const uint irq0 = PIO1_IRQ_0;
-    irq_set_exclusive_handler(irq0, pio_irq_handler_ffff_write);
-    irq_set_enabled(irq0, true);
+    //pio_set_irq1_source_enabled(DMA_PIO, pis_sm2_rx_fifo_not_empty, true);
+    pio_set_irq1_source_mask_enabled(DMA_PIO, (1 <<pis_sm3_rx_fifo_not_empty) | (1 <<pis_sm2_rx_fifo_not_empty), true);
 
+    //const uint irq1 = PIO1_IRQ_1;
+    irq_add_shared_handler(PIO1_IRQ_1, pio_irq_handler_ffff_write,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY );
+    //irq_set_exclusive_handler(PIO1_IRQ_1, pio_irq_handler_ffff_write);
+    irq_set_enabled(PIO1_IRQ_1, true);
+#endif
     //
     int dmaReadProgOffset = pio_add_program(FIFO_PIO, &dmaRead_program);
     if (dmaReadProgOffset<0)
@@ -330,9 +333,9 @@ void dmaPioInit()
 #endif
 
     PIO pioRwr = DMA_PIO;
-    const uint smRwr = dmaRomWrSm;
-    pio_sm_claim(pioRwr, smRwr);
-    uint irqRwr = PIO1_IRQ_0;
+    //const uint smRwr = dmaRomWrSm;
+    pio_sm_claim(pioRwr, dmaRomWrSm);
+    uint irqRwr = PIO1_IRQ_1;
     int romWriteProgramOffset = pio_add_program(pioRwr, &romWrite_program);
     if (romWriteProgramOffset < 0)
         panic("Failed add romWrite_program");
@@ -342,11 +345,12 @@ void dmaPioInit()
     sm_config_set_out_shift(&romConfigWr, SH_RIGHT, false, 32); // R shift
     sm_config_set_clkdiv(&romConfigWr, 1.0f);
 
-    pio_sm_init(pioRwr, smRwr, romWriteProgramOffset, &romConfigWr);
-    pio_set_irq0_source_enabled(pioRwr, pis_sm3_rx_fifo_not_empty, true);
-    irq_set_exclusive_handler(irqRwr, pio_irq_handler_rom_wr);
+    pio_sm_init(pioRwr, dmaRomWrSm, romWriteProgramOffset, &romConfigWr);
+    pio_set_irq1_source_mask_enabled(pioRwr, (1 <<pis_sm3_rx_fifo_not_empty) | (1 <<pis_sm2_rx_fifo_not_empty), true);
+    //irq_set_exclusive_handler(irqRwr, pio_irq_handler_rom_wr);
+    irq_add_shared_handler(irqRwr, pio_irq_handler_rom_wr, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY );
     irq_set_enabled(irqRwr, true);
-    pio_sm_set_enabled(pioRwr, smRwr, true /* false */);
+    pio_sm_set_enabled(pioRwr, dmaRomWrSm, true /* false */);
 }
 
 
@@ -447,6 +451,12 @@ void setup()
     gpio_init(PIN_USR_KEY);
     gpio_set_dir(PIN_USR_KEY, false);
     gpio_set_pulls(PIN_USR_KEY, true, false);
+
+    gpio_init_mask(HOLD2_MASK | ADDRWR_MASK | HLDA_MASK | PDC_nIOR_MASK | PDC_nIOW_MASK );
+    gpio_put(PIN_HOLD2, 0);
+    gpio_put(PIN_ADDRWR, 0);
+
+    gpio_set_dir_out_masked(ADDRWR_MASK | HOLD2_MASK);
 
     dmaPioInit();
     fifoPioInit();

@@ -173,7 +173,7 @@ void __not_in_flash_func(dma_receive)(BYTE *ptr, WORD len)
   //len /= 2;
   do
   {
-    *ptr++ = pio_sm_get_blocking(DMA_PIO, dmaWriteSm) & 0xFF;
+    *ptr++ = (pio_sm_get_blocking(DMA_PIO, dmaWriteSm) >> PIN_CD7) & 0xFF;
   } while (--len);
 #if INTS_OFF
   restore_interrupts(ints);

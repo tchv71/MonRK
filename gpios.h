@@ -22,8 +22,19 @@
 #define PIN_nIOR  3
 #define PIN_nFFFF_R 23
 #define PIN_nFFFF_W 2
-#define PIN_DIR   8
+#define PIN_PDC_nIOR  23
+#define PIN_PDC_nIOW  2
+#define PIN_HOLD2 9
+#define PIN_HLDA 22
+#define PIN_ADDRWR 5
+#define PIN_DIR   8 // 0 - out, 1 - in
 #define PIN_LED   25
+
+#define PDC_nIOR_MASK (1 << PIN_PDC_nIOR)
+#define PDC_nIOW_MASK (1 << PIN_PDC_nIOW)
+#define HOLD2_MASK   (1 << PIN_HOLD2)
+#define HLDA_MASK    (1 << PIN_HLDA)
+#define ADDRWR_MASK  (1 << PIN_ADDRWR)
 
 #define PIN_A0 28
 #define PIN_A1 29

@@ -36,8 +36,8 @@
 #define PIN_MOSI 11//3//11
 #define PIN_MISO 12//0//12
 #define PIN_CS   1
-#define PIN_RST  9//2
-#define PIN_IRQ  22//3
+//#define PIN_RST  9//2
+//#define PIN_IRQ  22//3
 
 /* Use SPI DMA */
 //#define USE_SPI_DMA // if you want to use SPI DMA, uncomment.

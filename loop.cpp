@@ -76,41 +76,145 @@ volatile uint8_t kbdMatr[16] = {255,255,255,255,255,255,255,255,255,255,255,255,
 #else
 volatile uint8_t kbdMatr[9] = {255,255,255,255,255,255,255,255,255};
 #endif
-volatile uint8_t portA = 0;
+volatile uint8_t portA = 0xFF;
 volatile uint8_t portB = 0xFF;
 volatile uint8_t portC = 0xE0; 
 volatile uint8_t portCtrl = 0x8A; 
 
-volatile uint8_t priSlots = 0;
+volatile uint8_t priSlots = 0xFF;
 volatile uint8_t extSlots = 0;
 // SlotID in F000EEPP format for pages 0-3
 volatile uint8_t extSlotsTbl[4] = {0};
 
+bool bProgDc_inited = false;
 
-void __not_in_flash_func(pio_irq_handler_ffff_write)()
+
+void __not_in_flash_func(port_set_addr)(uint8_t addr)
 {
-    uint32_t writeVal = pio_sm_get_blocking(DMA_PIO, ffffWriteSm); // DMA_PIO->rxf[fifoWrite2Sm];
+    gpio_put_masked(GPIO_CD_MASK, addr);
+    gpio_put(PIN_ADDRWR, 1);
+    __asm volatile ("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n");
+    gpio_put(PIN_ADDRWR, 0);
+}
 
-    extSlots = writeVal & 0xff;
-    uint8_t sltSel = (extSlots & 0xC0) >> 6;
-    pio_sm_put(FIFO_PIO, ffffReadSm, 0xFF << 8 | ~extSlots);
 
+uint8_t __not_in_flash_func(port_read)(uint8_t addr)
+{
+    port_set_addr(addr);
+    gpio_put(PIN_PDC_nIOR, 0);
+    __asm volatile ("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n");
+    gpio_put(PIN_DIR, 1);
+    uint8_t val = (gpio_get_all() >> PIN_CD7) & 0xFF;
+    gpio_put(PIN_DIR, 0);
+    gpio_put(PIN_PDC_nIOR, 1);
+    return val;
+}
+
+void  __not_in_flash_func(port_write)(uint8_t addr, uint8_t val)
+{
+    port_set_addr(addr);
+    gpio_put_masked(GPIO_CD_MASK, val);
+    gpio_put(PIN_PDC_nIOW, 0);
+    __asm volatile ("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n");
+    gpio_put(PIN_PDC_nIOW, 1);
+}
+
+void __no_inline_not_in_flash_func(progDc_init)()
+{
+    if (bProgDc_inited)
+        return;
+    pio_sm_set_enabled(DMA_PIO, ffffWriteSm, false);
+    pio_sm_set_enabled(DMA_PIO, dmaRomWrSm, false);
+    gpio_init_mask(HOLD2_MASK | HLDA_MASK | PDC_nIOR_MASK | PDC_nIOW_MASK | ADDRWR_MASK | DIR_MASK);
+    gpio_put(PIN_HOLD2, 1);
+    gpio_put(PIN_PDC_nIOR, 1);
+    gpio_put(PIN_PDC_nIOW, 1);
+    gpio_put(PIN_ADDRWR, 0);
+    gpio_put(PIN_DIR, 0);
+
+
+    gpio_set_dir_out_masked(PDC_nIOR_MASK | PDC_nIOW_MASK | ADDRWR_MASK | HOLD2_MASK | DIR_MASK);
+
+    gpio_set_dir(PIN_HOLD2, true);
+    while (!gpio_get(PIN_HLDA)) ;
+
+    static uint8_t val;
+    val = port_read(0xFF);
+    port_write(0xFF, 0xA0);
+
+    bProgDc_inited = true;
+}
+
+void __not_in_flash_func(progDc_close)()
+{
+    if (!bProgDc_inited)
+        return;
+
+    port_read(0xFF);
+    port_write(0xFF, 0x80); // Working mode
+
+    gpio_put(PIN_HOLD2, 0);
+    while (gpio_get(PIN_HLDA)) ;
+    gpio_set_dir_in_masked(PDC_nIOR_MASK | PDC_nIOW_MASK);
+    pio_gpio_init(FIFO_PIO, PIN_DIR);
+    pio_sm_set_enabled(DMA_PIO, ffffWriteSm, true);
+    pio_sm_set_enabled(DMA_PIO, dmaRomWrSm, true);
+   
+    bProgDc_inited = false;
+}
+
+void __no_inline_not_in_flash_func(setupMMap)(uint8_t oSlt, uint8_t sltSel)
+{
+    uint8_t oPriS = oSlt;
     uint8_t priS = priSlots;
     uint8_t extS = extSlots;
     for (uint8_t i = 0; i < 4; ++i)
     {
         uint8_t otbl = extSlotsTbl[i];
-        if ((otbl & 3) == sltSel)
+        bool bPriSlotChanged = (oPriS & 3) != (priS & 3);
+        if ( bPriSlotChanged || (otbl & 3) == sltSel)
         {
-            extSlotsTbl[i] = ((extS & 3) << 2) | (priS & 3) | 0x80;
-            if (otbl != extSlotsTbl[i])
+            uint8_t curSltId = ((extS & 3) << 2) | (priS & 3) | 0x80;
+            extSlotsTbl[i] = curSltId;
+            if (bPriSlotChanged ||  otbl != extSlotsTbl[i])
             {
+                progDc_init();
                 // Slot changed
+                if (curSltId == 0)
+                {
+                    // Slot 0 - MAIN ROM 32k
+                    for (uint8_t j = 0; j<0x40; ++j)
+                        port_write(j + i * 0x40, 3);
+                }
+                else if (curSltId == 0x83)
+                {
+                    // Slot 3-0
+                    uint8_t val = 5 + i * 0x40 + (i&1)*0x10;
+                    if (i>=2)
+                      val += 8;
+                    for (uint8_t j = 0; j<0x40; ++j)
+                        port_write(j + i * 0x40, val);
+                } 
             }
         }
+        oPriS >>= 2; 
         priS >>= 2;
         extS >>= 2;
     }
+    progDc_close();
+}
+
+void __not_in_flash_func(pio_irq_handler_ffff_write)()
+{
+    if (pio_sm_is_rx_fifo_empty(DMA_PIO, ffffWriteSm))
+         return;
+
+    uint32_t writeVal = pio_sm_get_blocking(DMA_PIO, ffffWriteSm); // DMA_PIO->rxf[fifoWrite2Sm];
+
+    extSlots = (writeVal >> (PIN_CD7 - PIN_nFFFF_W)) & 0xff;
+    uint8_t sltSel = (extSlots & 0xC0) >> 6;
+    pio_sm_put(FIFO_PIO, ffffReadSm, 0xFF << 8 | ~extSlots);
+    setupMMap(priSlots, sltSel);
 }
 
 
@@ -161,12 +265,10 @@ void __no_inline_not_in_flash_func (updateTX)()
     pio_sm_put_blocking(FIFO_PIO, fifoRomRdSm, ((uint32_t)portCtrl << 24) |((uint32_t)portC << 16) | ((uint32_t)portB << 8) | (uint32_t)portA);
 }
 
-
 void __not_in_flash_func(pio_irq_handler_rom_wr)()
 {
     if (pio_sm_is_rx_fifo_empty(DMA_PIO, dmaRomWrSm))
     {
-        for (int i=0;i<2;++i) ;
         return;
     }
     uint32_t val = pio_sm_get_blocking(DMA_PIO, dmaRomWrSm);
@@ -178,9 +280,13 @@ void __not_in_flash_func(pio_irq_handler_rom_wr)()
     {
 #if 1//def KBD_EMU
     case 0:
+    {
+        uint8_t oSlt = priSlots;
         priSlots = portA = v_val;
+        setupMMap(oSlt, 0);
         updateTX();
         break;
+    }
     case 1:
         portB = v_val;
         break;

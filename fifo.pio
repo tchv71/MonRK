@@ -140,7 +140,7 @@ loop0:
   wait 0 pin 0;gpio nIOW_PIN  ; wait for nIOW to go active (low)
   ;set pins, 0           ; reset wait trigger
   wait 1 pin 0;gpio nIOW_PIN  ; wait for nIOW high (inactive)
-  in pins, 16           ; grab the data CD0-7 and auto-push
+  in pins, 24           ; grab the data CD0-7 and auto-push
   ;;wait 1 gpio nDACK_PIN ; wait for nDACK_PIN to go inactive (high)
   ;set pins, 1
 .wrap
