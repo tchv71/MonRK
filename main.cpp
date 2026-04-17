@@ -190,11 +190,13 @@ void loadFifoWriteProgram()
     //
     pio_sm_init(DMA_PIO, fifoWrite2Sm, fifoWriteProgOffset, &writeConfig2);
     pio_sm_set_enabled(DMA_PIO, fifoWrite2Sm, true);
-    pio_set_irq0_source_enabled(DMA_PIO, pis_sm1_rx_fifo_not_empty, true);
-    //pio_set_irq0_source_mask_enabled(DMA_PIO, (1 <<pis_sm3_rx_fifo_not_empty) | (1 <<pis_sm1_rx_fifo_not_empty), true);
-    //irq_add_shared_handler(PIO1_IRQ_0, pio_irq_handler_write,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY );
-    irq_set_exclusive_handler(PIO1_IRQ_0, pio_irq_handler_write);
-    irq_set_enabled(PIO1_IRQ_0, true);
+
+    uint irq = PIO1_IRQ_0;
+    //pio_set_irq0_source_enabled(DMA_PIO, pis_sm1_rx_fifo_not_empty, true);
+    pio_set_irq0_source_mask_enabled(DMA_PIO, (1 <<pis_sm2_rx_fifo_not_empty) | (1 <<pis_sm1_rx_fifo_not_empty), true);
+    irq_add_shared_handler(irq, pio_irq_handler_write,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY );
+    //irq_set_exclusive_handler(irq, pio_irq_handler_write);
+    irq_set_enabled(irq, true);
 }
 /*
  * Set up PIOs for pico <-> CPU interface
@@ -275,13 +277,13 @@ void dmaPioInit()
 
     pio_sm_init(DMA_PIO, ffffWriteSm, dmaWriteProgOffset, &writeFFFFConfig);
     pio_sm_set_enabled(DMA_PIO, ffffWriteSm, true/* false */);
-    //pio_set_irq1_source_enabled(DMA_PIO, pis_sm2_rx_fifo_not_empty, true);
-    pio_set_irq1_source_mask_enabled(DMA_PIO, (1 <<pis_sm3_rx_fifo_not_empty) | (1 <<pis_sm2_rx_fifo_not_empty), true);
 
-    //const uint irq1 = PIO1_IRQ_1;
-    irq_add_shared_handler(PIO1_IRQ_1, pio_irq_handler_ffff_write,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY );
-    //irq_set_exclusive_handler(PIO1_IRQ_1, pio_irq_handler_ffff_write);
-    irq_set_enabled(PIO1_IRQ_1, true);
+    const uint irq = PIO1_IRQ_0;
+    //pio_set_irq1_source_enabled(DMA_PIO, pis_sm2_rx_fifo_not_empty, true);
+    pio_set_irq0_source_mask_enabled(DMA_PIO, (1 <<pis_sm2_rx_fifo_not_empty) | (1 <<pis_sm1_rx_fifo_not_empty), true);
+    irq_add_shared_handler(irq, pio_irq_handler_ffff_write,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY );
+    //irq_set_exclusive_handler(irq, pio_irq_handler_ffff_write);
+    irq_set_enabled(irq, true);
 #endif
     //
     int dmaReadProgOffset = pio_add_program(FIFO_PIO, &dmaRead_program);
