@@ -74,6 +74,7 @@ static inline void wizchip_deselect(void)
 
 void wizchip_reset()
 {
+#if 0
     gpio_init(PIN_RST);
 
 #ifdef USE_SPI_PIO
@@ -91,6 +92,7 @@ void wizchip_reset()
     sleep_ms(100);
 
     bi_decl(bi_1pin_with_name(PIN_RST, "W5x00 RESET"));
+#endif
 }
 
 #ifndef USE_SPI_PIO
