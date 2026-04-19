@@ -872,7 +872,7 @@ bool SaveBuffer()
 
 bool BufferWork(bool bRead, bool C);
 
-inline bool BiosRead()
+bool BiosRead()
 {
   a.WRITE_MODE = 2;
   return BufferWork(BW_READ, BW_READ_512);
@@ -942,7 +942,7 @@ bool CheckTrack()
   return BufferWork(BW_WRITE, BW_BLOCK_READ_512);
 }
 
-inline bool ReadWrite512()
+bool ReadWrite512()
 {
   NEW_COUNT = 0;
   return BufferWork(BW_WRITE, BW_READ_512);

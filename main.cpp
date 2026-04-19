@@ -298,7 +298,7 @@ void dmaPioInit()
 
     pio_sm_config readDmaConfig = dmaRead_program_get_default_config(dmaReadProgOffset);
     //sm_config_set_in_pins(&readDmaConfig, PIN_CSR);
-    sm_config_set_jmp_pin(&readDmaConfig, PIN_nDACK);
+    //sm_config_set_jmp_pin(&readDmaConfig, PIN_nDACK);
     sm_config_set_in_pin_base(&readDmaConfig, PIN_nIOR);
     sm_config_set_fifo_join(&readDmaConfig, PIO_FIFO_JOIN_TX);
     sm_config_set_sideset_pin_base(&readDmaConfig, PIN_DIR);
@@ -480,7 +480,7 @@ void setup1()
     sd_init();
     multicore_fifo_push_blocking(1);
 
-    gpio_init_mask(A0_MASK | A1_MASK | nCS2_MASK | /* GPIO_CD_MASK |  */ nWR_MASK | nRD_MASK | nIOR_MASK | nIOR_MASK);
+    gpio_init_mask(A0_MASK | A1_MASK | /*nCS2_MASK |  GPIO_CD_MASK |  */ nWR_MASK | nRD_MASK | nIOR_MASK | nIOR_MASK);
 
     gpio_init(PIN_SPI_CSn);
     gpio_put(PIN_SPI_CSn, 1);
@@ -496,8 +496,8 @@ void setup1()
     //gpio_set_drive_strength(PIN_nWAIT, GPIO_DRIVE_STRENGTH_12MA);
     //gpio_pull_down(PIN_nWAIT);
 
-    gpio_init(PIN_nDACK);
-    gpio_set_dir(PIN_nDACK, GPIO_IN);
+    //gpio_init(PIN_nDACK);
+    //gpio_set_dir(PIN_nDACK, GPIO_IN);
 
     gpio_init(PIN_nIOR);
     gpio_set_dir(PIN_nIOR, GPIO_IN);
@@ -750,6 +750,9 @@ uint32_t lastTimestamp = to_ms_since_boot(get_absolute_time());
 
 int main()
 {
+
+    sleep_ms(150);
+    
     vreg_set_voltage(VREG_VOLTAGE_1_30);
     set_sys_clock_pll(PICO_CLOCK_PLL, PICO_CLOCK_PLL_DIV1, PICO_CLOCK_PLL_DIV2); // 252000
     //set_sys_clock_khz(320000, false);

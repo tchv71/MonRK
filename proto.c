@@ -140,7 +140,7 @@ void __not_in_flash_func(dma_send)(const BYTE *ptr, WORD len)
   restore_interrupts(ints);
 #endif
   while (!pio_sm_is_tx_fifo_empty(FIFO_PIO, dmaReadSm)) ;
-  while (gpio_get(PIN_nDACK) == 0) ;
+  while (gpio_get(PIN_nIOR/*PIN_nDACK*/) == 0) ;
   gpio_put(PIN_DRQ, 0);
 #else
   gpio_init(PIN_DRQ);
