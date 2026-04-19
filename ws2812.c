@@ -3,11 +3,11 @@
 
 
 void ws2812_set_rgb(uint8_t red, uint8_t green, uint8_t blue) {
-  //pio_sm_restart(WS2812_PIO, WS2812_SM);
+  pio_sm_restart(WS2812_PIO, WS2812_SM);
 
   // write the rgb
   uint32_t mask = (green << 16) | (red << 8) | (blue << 0);
-  //pio_sm_put_blocking(WS2812_PIO, WS2812_SM, mask << 8u);
+  pio_sm_put_blocking(WS2812_PIO, WS2812_SM, mask << 8u);
 }
 
 void ws2812_init() {
@@ -17,6 +17,18 @@ void ws2812_init() {
 void ws2812_reset() {
   // turn it off
   ws2812_set_rgb(0, 0, 0);
-  //pio_sm_set_enabled(WS2812_PIO, WS2812_SM, false);
-  //pio_sm_restart(WS2812_PIO, WS2812_SM);
+  pio_sm_set_enabled(WS2812_PIO, WS2812_SM, false);
+  pio_sm_restart(WS2812_PIO, WS2812_SM);
+}
+
+void  ws2812_program_deinit(PIO pio, uint sm, uint pin)
+{
+  pio_sm_set_enabled(pio, sm, false);
+  pio_remove_program_and_unclaim_sm(&ws2812_program, pio, sm, offset);
+  gpio_init(pin);
+}
+
+void ws2812_deinit()
+{
+  ws2812_program_deinit(WS2812_PIO, WS2812_SM, WS2812_PIN);
 }

@@ -27,12 +27,16 @@ do_zero:
 
 % c-sdk {
 #include "hardware/clocks.h"
+uint offset = 0;
 
 static inline void ws2812_program_init(PIO pio, uint sm, uint pin, bool rgbw) {
     pio_gpio_init(pio, pin);
     pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
 
-    uint offset = pio_add_program(WS2812_PIO, &ws2812_program);
+    pio_sm_claim(WS2812_PIO, sm);
+    offset = pio_add_program(WS2812_PIO, &ws2812_program);
+    if((int)offset < 0)
+        panic("Failed add ws2812_program");
     pio_sm_config c = ws2812_program_get_default_config(offset);
     sm_config_set_sideset_pins(&c, pin);
     sm_config_set_out_shift(&c, false, true, rgbw ? 32 : 24);

@@ -12,6 +12,7 @@ extern "C" {
 
 void ws2812_set_rgb(uint8_t red, uint8_t green, uint8_t blue);
 void ws2812_init();
+void ws2812_deinit();
 void ws2812_reset();
 #ifdef __cplusplus
 }

@@ -442,6 +442,11 @@ extern void networkInit();
 
 void setup()
 {
+    ws2812_init();
+    ws2812_set_rgb(0,64,0);
+    sleep_ms(10);
+    ws2812_deinit();
+
     gpio_init_mask(GPIO_CD_MASK | GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK | GPIO_A1_MASK);
     gpio_set_dir_in_masked(GPIO_CSW_MASK | GPIO_CSR_MASK | GPIO_A0_MASK | GPIO_A1_MASK);
     gpio_init(PIN_DIR);
@@ -511,6 +516,7 @@ void setup1()
     LedOff();
     // SD cards' DO MUST be pulled up.
     gpio_pull_up(PIN_SPI_RX);
+
 }
 
 

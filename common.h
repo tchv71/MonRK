@@ -52,12 +52,15 @@ extern bool lastLedVal;
 #define LedOff() Led(false)
 #define LedOn()  Led(true)
 
-#define dmaWriteSm 0
-#define fifoRomRdSm 2
-#define dmaReadSm  1
+// PIO0
 #define fifoReadSm 0
-#define fifoWrite2Sm 1
+#define dmaReadSm  1
+#define fifoRomRdSm 2
 #define ffffReadSm 3
+
+// PIO1
+#define dmaWriteSm 0
+#define fifoWrite2Sm 1
 #define ffffWriteSm 2
 #define dmaRomWrSm 3
 
