@@ -269,18 +269,18 @@ void dmaPioInit()
         panic("Failed add dmaReadProgram");
 
     pio_gpio_init(FIFO_PIO, PIN_DIR);
-    pio_gpio_init(FIFO_PIO, PIN_nWAIT);
-    uint32_t mask = DIR_MASK | nWAIT_MASK;
+    //pio_gpio_init(FIFO_PIO, PIN_nWAIT);
+    uint32_t mask = DIR_MASK;// | nWAIT_MASK;
     pio_sm_set_pins_with_mask(FIFO_PIO, dmaReadSm, mask, mask);
     pio_sm_set_pindirs_with_mask(FIFO_PIO, dmaReadSm, mask, mask);
 
     pio_sm_config readDmaConfig = dmaRead_program_get_default_config(dmaReadProgOffset);
     //sm_config_set_in_pins(&readDmaConfig, PIN_CSR);
-    sm_config_set_jmp_pin(&readDmaConfig, PIN_nDACK);
+    //sm_config_set_jmp_pin(&readDmaConfig, PIN_nDACK);
     sm_config_set_fifo_join(&readDmaConfig, PIO_FIFO_JOIN_TX);
     sm_config_set_sideset_pin_base(&readDmaConfig, PIN_DIR);
     sm_config_set_out_pins(&readDmaConfig, PIN_CD7, 8);
-    sm_config_set_set_pins(&readDmaConfig, PIN_nWAIT, 1);
+    //sm_config_set_set_pins(&readDmaConfig, PIN_nWAIT, 1);
     sm_config_set_in_shift(&readDmaConfig, true, false, 32); // R shift
     sm_config_set_out_shift(&readDmaConfig, true, false, 32); // R shift
     sm_config_set_clkdiv(&readDmaConfig, 1.0f);
@@ -428,7 +428,7 @@ void setup1()
     sd_init();
     multicore_fifo_push_blocking(1);
 
-    gpio_init_mask(A0_MASK | A1_MASK | nCS2_MASK | /* GPIO_CD_MASK |  */ nWR_MASK | nRD_MASK | nIOR_MASK | nIOR_MASK);
+    gpio_init_mask(A0_MASK | A1_MASK | /* nCS2_MASK | GPIO_CD_MASK |  */ nWR_MASK | nRD_MASK | nIOR_MASK | nIOR_MASK);
 
     gpio_init(PIN_SPI_CSn);
     gpio_put(PIN_SPI_CSn, 1);
@@ -441,11 +441,11 @@ void setup1()
     // gpio_init(PIN_nWAIT);
     // gpio_put(PIN_nWAIT, 1);
     // gpio_set_dir(PIN_nWAIT, GPIO_OUT);
-    gpio_set_drive_strength(PIN_nWAIT, GPIO_DRIVE_STRENGTH_12MA);
-    gpio_pull_down(PIN_nWAIT);
+    //gpio_set_drive_strength(PIN_nWAIT, GPIO_DRIVE_STRENGTH_12MA);
+    //gpio_pull_down(PIN_nWAIT);
 
-    gpio_init(PIN_nDACK);
-    gpio_set_dir(PIN_nDACK, GPIO_IN);
+    //gpio_init(PIN_nDACK);
+    //gpio_set_dir(PIN_nDACK, GPIO_IN);
 
     gpio_init(PIN_nIOR);
     gpio_set_dir(PIN_nIOR, GPIO_IN);

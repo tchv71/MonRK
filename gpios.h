@@ -58,7 +58,7 @@ enum
 #define nWR_MASK  (1 << PIN_nWR)
 #define nRD_MASK  (1 << PIN_nRD)
 
-#define nWAIT_MASK (1 << PIN_nWAIT)
+//#define nWAIT_MASK (1 << PIN_nWAIT)
 #define DRQ_MASK   (1 << PIN_DRQ)
 //#define nDACK_MASK (1 << PIN_nDACK)
 #define nIOW_MASK  (1 << PIN_nIOW)
