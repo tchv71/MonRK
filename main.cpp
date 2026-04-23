@@ -129,8 +129,6 @@ bool updateFifoReadAhead();
 
 void setupFifoGpio()
 {
-    bufIn.clear();
-    bufOut.clear();
 
     for (uint i = 0; i < 8; ++i)
     {
@@ -142,6 +140,8 @@ void setupFifoGpio()
 
 void loadFifoReadProgram()
 {
+    bufIn.clear();
+    bufOut.clear();
     setupFifoGpio();
     pio_sm_claim(FIFO_PIO, fifoReadSm);
     pio_sm_clear_fifos(FIFO_PIO, fifoReadSm);
@@ -279,7 +279,7 @@ void dmaPioInit()
     pio_sm_set_enabled(DMA_PIO, ffffWriteSm, true/* false */);
 
     const uint irq = PIO1_IRQ_0;
-    //pio_set_irq1_source_enabled(DMA_PIO, pis_sm2_rx_fifo_not_empty, true);
+    //pio_set_irq0_source_enabled(DMA_PIO, pis_sm2_rx_fifo_not_empty, true);
     pio_set_irq0_source_mask_enabled(DMA_PIO, (1 <<pis_sm2_rx_fifo_not_empty) | (1 <<pis_sm1_rx_fifo_not_empty), true);
     irq_add_shared_handler(irq, pio_irq_handler_ffff_write,PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY );
     //irq_set_exclusive_handler(irq, pio_irq_handler_ffff_write);
