@@ -473,7 +473,7 @@ void setup()
 #endif
     multicore_fifo_push_blocking(0);
 }
-
+volatile BYTE res1;
 void setup1()
 {
     spi_init(_SPI, BAUD);
@@ -482,7 +482,8 @@ void setup1()
     // gpio_set_function(PIN_SPI_CSn, GPIO_FUNC_SPI);
     gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI);
     gpio_set_function(PIN_SPI_TX, GPIO_FUNC_SPI);
-    sd_init();
+    busy_wait_ms(300);
+    res1 = sd_init();
     multicore_fifo_push_blocking(1);
 
     gpio_init_mask(A0_MASK | A1_MASK | /*nCS2_MASK |  GPIO_CD_MASK |  */ nWR_MASK | nRD_MASK | nIOR_MASK | nIOR_MASK);
@@ -754,19 +755,8 @@ void tuh_hid_umount_cb(uint8_t daddr, uint8_t instance)
 
 uint32_t lastTimestamp = to_ms_since_boot(get_absolute_time());
 
-int main()
+void main0()
 {
-
-    sleep_ms(150);
-    
-    vreg_set_voltage(VREG_VOLTAGE_1_30);
-    set_sys_clock_pll(PICO_CLOCK_PLL, PICO_CLOCK_PLL_DIV1, PICO_CLOCK_PLL_DIV2); // 252000
-    //set_sys_clock_khz(320000, false);
-    recursive_mutex_init(get_sd_mutex());
-    stdio_init_all();
-    // stdio_set_translate_crlf(&stdio_usb, false);
-
-    multicore_launch_core1(main1);
     setup();
 #if 1//def KBD_EMU
     tusb_init(); // инициализация USB OTG
@@ -795,4 +785,25 @@ int main()
             lastTimestamp = timestamp;
         }
     }
+}
+
+int main()
+{
+
+    sleep_ms(150);
+    
+    vreg_set_voltage(VREG_VOLTAGE_1_30);
+    set_sys_clock_pll(PICO_CLOCK_PLL, PICO_CLOCK_PLL_DIV1, PICO_CLOCK_PLL_DIV2); // 252000
+    //set_sys_clock_khz(320000, false);
+    recursive_mutex_init(get_sd_mutex());
+    stdio_init_all();
+    //stdio_set_translate_crlf(&stdio_usb, false);
+
+#if 1
+    multicore_launch_core1(main1);
+    main0();
+#else
+    multicore_launch_core1(main0);
+    main1();
+#endif
 }

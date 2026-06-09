@@ -1188,7 +1188,7 @@ int res = 0;
 void  __not_in_flash_func(main_sd)()
 {
   DATA_IN();
-  busy_wait_ms(500);
+  busy_wait_ms(300);
   multicore_fifo_pop_blocking();
   LedOn();
   // Пауза, пока не стабилизируется питание

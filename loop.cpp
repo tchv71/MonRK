@@ -89,26 +89,28 @@ volatile uint8_t extSlotsTbl[4] = {0};
 bool bProgDc_inited = false;
 
 
-void __no_inline_not_in_flash_func(port_set_addr)(uint8_t addr)
+void __not_in_flash_func(port_set_addr)(uint8_t addr)
 {
     gpio_put(PIN_DIR, 0);
     gpio_set_dir_out_masked(GPIO_CD_MASK);
     gpio_put_masked(GPIO_CD_MASK, ((int)addr) << PIN_CD7);
     gpio_put(PIN_ADDRWR, 1);
     //__asm volatile ("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n");
-    sleep_us(1);
+    //sleep_us(1);
+    busy_wait_us_32(1);
     gpio_put(PIN_ADDRWR, 0);
 }
 
 
-uint8_t __not_in_flash_func(port_read)(uint8_t addr)
+uint8_t __no_inline_not_in_flash_func(port_read)(uint8_t addr)
 {
     port_set_addr(addr);
     gpio_put(PIN_DIR, 1);
     gpio_set_dir_in_masked(GPIO_CD_MASK);
     gpio_put(PIN_PDC_nIOR, 0);
     //__asm volatile("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n");
-    sleep_us(1);
+    //sleep_us(1);
+    busy_wait_us_32(1);
     uint8_t val = (gpio_get_all() >> PIN_CD7) & 0xFF;
     gpio_set_dir_out_masked(GPIO_CD_MASK);
     gpio_put(PIN_PDC_nIOR, 1);
@@ -116,13 +118,14 @@ uint8_t __not_in_flash_func(port_read)(uint8_t addr)
     return val;
 }
 
-void  __not_in_flash_func(port_write)(uint8_t addr, uint8_t val)
+void  __no_inline_not_in_flash_func(port_write)(uint8_t addr, uint8_t val)
 {
     port_set_addr(addr);
     gpio_put_masked(GPIO_CD_MASK, ((int)val) << PIN_CD7);
     gpio_put(PIN_PDC_nIOW, 0);
     //__asm volatile ("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n");
-    sleep_us(1);
+    //sleep_us(1);
+    busy_wait_us_32(1);
     gpio_put(PIN_PDC_nIOW, 1);
 }
 
@@ -136,18 +139,17 @@ void __no_inline_not_in_flash_func(progDc_init)()
     pio_sm_set_enabled(DMA_PIO, ffffWriteSm, false);
     pio_sm_set_enabled(DMA_PIO, dmaRomWrSm, false);
     gpio_init_mask(HOLD2_MASK | HLDA_MASK | PDC_nIOR_MASK | PDC_nIOW_MASK | ADDRWR_MASK | DIR_MASK | GPIO_CD_MASK);
-    gpio_put(PIN_HOLD2, 1);
-    gpio_put(PIN_PDC_nIOR, 1);
-    gpio_put(PIN_PDC_nIOW, 1);
-    gpio_put(PIN_ADDRWR, 0);
-    gpio_put(PIN_DIR, 0);
-    //gpio_put_masked(GPIO_CD_MASK, 0xFF <<  PIN_CD7);
 
+    while (gpio_get(PIN_HLDA)) ; // Wait other DMA cycle to stop
+    //sleep_ms(1);
+    busy_wait_us_32(100);
+
+    gpio_put_masked(HOLD2_MASK | PDC_nIOR_MASK | PDC_nIOW_MASK | ADDRWR_MASK | DIR_MASK, /* HOLD2_MASK | */ PDC_nIOR_MASK | PDC_nIOW_MASK);
+    
+    gpio_put(PIN_HOLD2, true);
 
     gpio_set_dir_out_masked(PDC_nIOR_MASK | PDC_nIOW_MASK | ADDRWR_MASK | HOLD2_MASK | DIR_MASK | GPIO_CD_MASK);
 
-    while (gpio_get(PIN_HLDA)) ; // Wait other DMA cycle to stop
-    gpio_set_dir(PIN_HOLD2, true);
     while (!gpio_get(PIN_HLDA)) ;
 
     val = port_read(0xFF);
@@ -205,7 +207,7 @@ void __no_inline_not_in_flash_func(setupMMap)(uint8_t oSlt, uint8_t sltSel)
                 {
                     // Slot 0 - MAIN ROM 32k
                     for (uint8_t j = 0; j<0x40; ++j)
-                        port_write(j + i * 0x40, 3);
+                        port_write(j + i * 0x40, 4+0x80);
                 }
                 else if (curSltId == 0x83)
                 {
