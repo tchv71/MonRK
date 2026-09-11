@@ -1,4 +1,5 @@
 {
+    "cmake.showSystemKits": false,
     "cmake.options.statusBarVisibility": "hidden",
     "cmake.options.advanced": {
         "build": {
@@ -9,60 +10,37 @@
         },
         "debug": {
             "statusBarVisibility": "hidden"
+        },
+        "variant": {
+            "statusBarVisibility": "hidden"
+        },
+        "buildTarget": {
+            "statusBarVisibility": "hidden"
         }
     },
     "cmake.configureOnEdit": false,
     "cmake.automaticReconfigure": false,
     "cmake.configureOnOpen": false,
     "cmake.generator": "Ninja",
-    "cmake.cmakePath": "${userHome}/.pico-sdk/cmake/v3.31.5/bin/cmake",
+    "cmake.cmakePath": "${userHome}/.pico-sdk/cmake/v4.3.4/bin/cmake",
     "C_Cpp.debugShortcut": false,
     "terminal.integrated.env.windows": {
-        "PICO_SDK_PATH": "${env:USERPROFILE}/.pico-sdk/sdk/2.2.0",
-        "PICO_TOOLCHAIN_PATH": "${env:USERPROFILE}/.pico-sdk/toolchain/14_3_Rel1",
-        "Path": "${env:USERPROFILE}/.pico-sdk/toolchain/14_3_Rel1/bin;${env:USERPROFILE}/.pico-sdk/picotool/2.2.0-a4/picotool;${env:USERPROFILE}/.pico-sdk/cmake/v3.31.5/bin;${env:USERPROFILE}/.pico-sdk/ninja/v1.12.1;${env:PATH}"
+        "PICO_SDK_PATH": "${env:USERPROFILE}/.pico-sdk/sdk/2.3.1",
+        "PICO_TOOLCHAIN_PATH": "${env:USERPROFILE}/.pico-sdk/toolchain/15_2_Rel1",
+        "Path": "${env:USERPROFILE}/.pico-sdk/toolchain/15_2_Rel1/bin;${env:USERPROFILE}/.pico-sdk/picotool/2.3.1/picotool;${env:USERPROFILE}/.pico-sdk/cmake/v4.3.4/bin;${env:USERPROFILE}/.pico-sdk/ninja/v1.13.2;${env:PATH}"
     },
     "terminal.integrated.env.osx": {
-        "PICO_SDK_PATH": "${env:HOME}/.pico-sdk/sdk/2.2.0",
-        "PICO_TOOLCHAIN_PATH": "${env:HOME}/.pico-sdk/toolchain/14_3_Rel1",
-        "PATH": "${env:HOME}/.pico-sdk/toolchain/14_3_Rel1/bin:${env:HOME}/.pico-sdk/picotool/2.2.0-a4/picotool:${env:HOME}/.pico-sdk/cmake/v3.31.5/bin:${env:HOME}/.pico-sdk/ninja/v1.12.1:${env:PATH}"
+        "PICO_SDK_PATH": "${env:HOME}/.pico-sdk/sdk/2.3.1",
+        "PICO_TOOLCHAIN_PATH": "${env:HOME}/.pico-sdk/toolchain/15_2_Rel1",
+        "PATH": "${env:HOME}/.pico-sdk/toolchain/15_2_Rel1/bin:${env:HOME}/.pico-sdk/picotool/2.3.1/picotool:${env:HOME}/.pico-sdk/cmake/v4.3.4/bin:${env:HOME}/.pico-sdk/ninja/v1.13.2:${env:PATH}"
     },
     "terminal.integrated.env.linux": {
-        "PICO_SDK_PATH": "${env:HOME}/.pico-sdk/sdk/2.2.0",
-        "PICO_TOOLCHAIN_PATH": "${env:HOME}/.pico-sdk/toolchain/14_3_Rel1",
-        "PATH": "${env:HOME}/.pico-sdk/toolchain/14_3_Rel1/bin:${env:HOME}/.pico-sdk/picotool/2.2.0-a4/picotool:${env:HOME}/.pico-sdk/cmake/v3.31.5/bin:${env:HOME}/.pico-sdk/ninja/v1.12.1:${env:PATH}"
+        "PICO_SDK_PATH": "${env:HOME}/.pico-sdk/sdk/2.3.1",
+        "PICO_TOOLCHAIN_PATH": "${env:HOME}/.pico-sdk/toolchain/15_2_Rel1",
+        "PATH": "${env:HOME}/.pico-sdk/toolchain/15_2_Rel1/bin:${env:HOME}/.pico-sdk/picotool/2.3.1/picotool:${env:HOME}/.pico-sdk/cmake/v4.3.4/bin:${env:HOME}/.pico-sdk/ninja/v1.13.2:${env:PATH}"
     },
     "raspberry-pi-pico.cmakeAutoConfigure": true,
     "raspberry-pi-pico.useCmakeTools": false,
-    "raspberry-pi-pico.cmakePath": "${HOME}/.pico-sdk/cmake/v3.31.5/bin/cmake",
-    "raspberry-pi-pico.ninjaPath": "${HOME}/.pico-sdk/ninja/v1.12.1/ninja",
-    "files.associations": {
-        "tusb_option.h": "c",
-        "tusb_compiler.h": "c",
-        "tusb_config.h": "c",
-        "cstdlib": "cpp",
-        "tusb_common.h": "c",
-        "common.h": "c",
-        "time.h": "c",
-        "gpios.h": "c",
-        "sync.h": "c",
-        "timer.h": "c",
-        "sntp.h": "c",
-        "proto.h": "c",
-        "ftpd.h": "c",
-        "multicore.h": "c",
-        "gpio.h": "c",
-        "spi_sd.h": "c",
-        "device.h": "c",
-        "tusb.h": "c",
-        "cdc.h": "c",
-        "driver.h": "c",
-        "fs.h": "c",
-        "stdio.h": "c",
-        "fcntl.h": "c",
-        "ftpd_cpm.h": "c",
-        "cpmfs.h": "c",
-        "w5x00_spi.h": "c"
-    },
-    "cortex-debug.variableUseNaturalFormat": false
+    "raspberry-pi-pico.cmakePath": "${HOME}/.pico-sdk/cmake/v4.3.4/bin/cmake",
+    "raspberry-pi-pico.ninjaPath": "${HOME}/.pico-sdk/ninja/v1.13.2/ninja"
 }

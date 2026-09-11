@@ -811,7 +811,7 @@ uint8_t DHCP_run(void)
 					
 				}
          #ifdef _DHCP_DEBUG_
-            else //printf(">IP is continued.\r\n");
+            //else printf(">IP is continued.\r\n");
          #endif            				
 				reset_DHCP_timeout();
 				dhcp_state = STATE_DHCP_LEASED;
