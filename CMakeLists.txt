@@ -41,7 +41,7 @@ add_subdirectory(WIZnet-PICO-C)
 add_executable(MonRk )
 target_sources(MonRk PRIVATE main.cpp
 # Serial.cpp RP2040USB.cpp
- loop.cpp sd.c 86rksd.c fs.c proto.c WIZnet-PICO-C/port/ioLibrary_Driver/src/w5x00_spi.c usb_msc_driver.c
+ loop.cpp sd.c 86rksd.c fs.c proto.c WIZnet-PICO-C/port/ioLibrary_Driver/src/wizchip_spi.c usb_msc_driver.c
  cpmfs.c device.c scancode_rk.c ws2812.c 
 )
 add_compile_definitions(PICO_STACK_SIZE=0x4000)
