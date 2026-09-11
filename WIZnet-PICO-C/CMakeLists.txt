@@ -4,16 +4,16 @@ if(WIN32)
 else()
     set(USERHOME $ENV{HOME})
 endif()
-set(sdkVersion 2.1.1)
-set(toolchainVersion 14_2_Rel1)
-set(picotoolVersion 2.1.1)
+set(sdkVersion 2.3.0)
+set(toolchainVersion 15_2_Rel1)
+set(picotoolVersion 2.3.0)
 set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
 set(PICO_BOARD pico CACHE STRING "Board type")
-set(CMAKE_SOURCE_DIR D:/Pico/MonRK/WIZnet-PICO-C)
+set(CMAKE_SOURCE_DIR ${CMAKE_SOURCE_DIR}/WIZnet-PICO-C)#/Users/tchv/RK/MonRK/WIZnet-PICO-C)
 # CMake minimum required version
 cmake_minimum_required(VERSION 3.12)
  
@@ -63,7 +63,7 @@ endif()
 
 message(STATUS "WIZNET_CHIP = ${WIZNET_CHIP}")
 
-set(PICO_SDK_PATH C:/Users/tchv7/.pico-sdk/sdk/2.1.1)
+#set(PICO_SDK_PATH C:/Users/tchv7/.pico-sdk/sdk/2.1.1)
 message("Using PICO_SDK_PATH from environment ('${PICO_SDK_PATH}')")
 
 #if(NOT DEFINED PICO_SDK_PATH)
