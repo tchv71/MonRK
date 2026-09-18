@@ -54,7 +54,7 @@ endPart:
   wait 1 gpio CSR_PIN ; wait for CSR to go high (inactive) 
 .wrap
 
-.program romRead
+.program kbdRead
 .define public PIN_nRD 7
 .side_set 1 opt
   pull block
@@ -63,7 +63,7 @@ endPart:
   mov osr, null       ; change CD0-7 pindirs to inputs
   out pindirs, 8 side 1
   wait 0 gpio PIN_nRD
-;romRead:
+;kbdRead:
   mov isr, null
   mov OSR, !null
   out pindirs, 8 side 0   ; set up CD0-7 as outputs
@@ -85,7 +85,7 @@ loop0:
   wait 1 gpio PIN_nRD
 .wrap
 
-.program romWrite
+.program kbdWrite
 .define public PIN_nWR 6
 .wrap_target
   wait 0 gpio PIN_nWR
