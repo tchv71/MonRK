@@ -51,11 +51,11 @@ extern bool lastLedVal;
 #define LedOn()  Led(true)
 
 #define dmaWriteSm 0
-#define fifoRomRdSm 2
+#define fifoKbdRdSm 2
 #define dmaReadSm  1
 #define fifoReadSm 0
 #define fifoWrite2Sm 1
-#define dmaRomWrSm 3
+#define dmaKbdWrSm 3
 
 // #ifdef __cplusplus
 // }

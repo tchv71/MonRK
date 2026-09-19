@@ -17,7 +17,7 @@ void DATA_BUS_IN()
 void __not_in_flash_func(WRITE_DATA)(uint8_t val)
 {
   v55_buf[0] = val;
-  pio_sm_put(FIFO_PIO, dmaRomSm, 0xFF << 8 | val);
+  pio_sm_put(FIFO_PIO, dmaKbdSm, 0xFF << 8 | val);
 }
 
 uint8_t __not_in_flash_func(READ_DATA)()

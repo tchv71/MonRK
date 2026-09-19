@@ -102,7 +102,7 @@ bool bPpiKbdMode = true;
 
 void __no_inline_not_in_flash_func (updateTX)()
 {
-    pio_sm_clear_fifos(FIFO_PIO, fifoRomRdSm);
+    pio_sm_clear_fifos(FIFO_PIO, fifoKbdRdSm);
     if (!bPpiKbdMode)
     {
         int diffX = (mouseXAbs - mouseXAbsOld) / mouseDiv;
@@ -125,18 +125,18 @@ void __no_inline_not_in_flash_func (updateTX)()
         }
     }
 
-    pio_sm_put_blocking(FIFO_PIO, fifoRomRdSm, ((uint32_t)portCtrl << 24) |((uint32_t)portC << 16) | ((uint32_t)portB << 8) | (uint32_t)portA);
+    pio_sm_put_blocking(FIFO_PIO, fifoKbdRdSm, ((uint32_t)portCtrl << 24) |((uint32_t)portC << 16) | ((uint32_t)portB << 8) | (uint32_t)portA);
 }
 
 
-void __not_in_flash_func(pio_irq_handler_rom_wr)()
+void __not_in_flash_func(pio_irq_handler_kbd_wr)()
 {
-    if (pio_sm_is_rx_fifo_empty(DMA_PIO, dmaRomWrSm))
+    if (pio_sm_is_rx_fifo_empty(DMA_PIO, dmaKbdWrSm))
     {
         for (int i=0;i<2;++i) ;
         return;
     }
-    uint32_t val = pio_sm_get_blocking(DMA_PIO, dmaRomWrSm);
+    uint32_t val = pio_sm_get_blocking(DMA_PIO, dmaKbdWrSm);
     DMA_PIO->irq = 1;
 
     uint8_t w_addr = (val & 3);
@@ -191,7 +191,7 @@ void __not_in_flash_func(pio_irq_handler_rom_wr)()
     {
         addr |= ((int16_t)v_val) << 8;
         uint8_t r_val = rom[addr & 0x7f];
-        pio_sm_put_blocking(FIFO_PIO, dmaRomSm, 0xFF << 8 | r_val);
+        pio_sm_put_blocking(FIFO_PIO, dmaKbdSm, 0xFF << 8 | r_val);
     }
     break;
 #endif
@@ -200,11 +200,11 @@ void __not_in_flash_func(pio_irq_handler_rom_wr)()
     }
 }
 
-void __not_in_flash_func(pio_irq_handler_rom_rd)()
+void __not_in_flash_func(pio_irq_handler_kbd_rd)()
 {
-    if (pio_sm_is_rx_fifo_empty(FIFO_PIO, fifoRomRdSm))
+    if (pio_sm_is_rx_fifo_empty(FIFO_PIO, fifoKbdRdSm))
         return;
-    uint32_t val = pio_sm_get_blocking(FIFO_PIO, fifoRomRdSm);
+    uint32_t val = pio_sm_get_blocking(FIFO_PIO, fifoKbdRdSm);
     uint8_t w_addr = (val & 3);
     if (!bPpiKbdMode)
     {
